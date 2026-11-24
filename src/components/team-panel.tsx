@@ -3,8 +3,8 @@
 import { KeyRound } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { ROLE_DOT, type RoleName } from '@/lib/permissions';
-import { apiJson, CARD_CLS, fmtUtc, TD_CLS, TH_CLS, type RequestState } from '@/lib/ui';
+import { ROLE_DOT, type RoleName } from '../lib/permissions';
+import { apiJson, CARD_CLS, fmtUtc, TD_CLS, TH_CLS, type RequestState } from '../lib/ui';
 import { CustomSelect } from './custom-select';
 import { ProvisionForm, ROLE_OPTIONS } from './provision-form';
 import { SessionsTable, type ActiveSessionRow } from './sessions-table';

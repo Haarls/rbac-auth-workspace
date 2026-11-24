@@ -2,7 +2,7 @@
 
 import { Search } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { CARD_CLS, fmtUtc, TD_CLS, TH_CLS } from '@/lib/ui';
+import { CARD_CLS, fmtUtc, TD_CLS, TH_CLS } from '../lib/ui';
 import { CustomSelect } from './custom-select';
 
 export interface AuditEntryRow {

@@ -1,8 +1,8 @@
 import { redirect } from 'next/navigation';
-import { WorkspaceShell } from '@/components/workspace-shell';
-import { getActiveSession } from '@/lib/auth';
-import { prisma } from '@/lib/db';
-import { hasPermission } from '@/lib/permissions';
+import { WorkspaceShell } from '../components/workspace-shell';
+import { getActiveSession } from '../lib/auth';
+import { prisma } from '../lib/db';
+import { hasPermission } from '../lib/permissions';
 
 export const dynamic = 'force-dynamic';
 

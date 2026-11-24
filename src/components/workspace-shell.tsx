@@ -3,8 +3,8 @@
 import { Info, KeyRound, LogOut, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { hasPermission, ROLE_DOT, type RoleName } from '@/lib/permissions';
-import { apiJson, BTN_GHOST } from '@/lib/ui';
+import { hasPermission, ROLE_DOT, type RoleName } from '../lib/permissions';
+import { apiJson, BTN_GHOST } from '../lib/ui';
 import { AuditPanel, type AuditEntryRow } from './audit-panel';
 import { BrandIsotipo } from './pin-otp-input';
 import { PinSwitchModal, type OperatorOption } from './pin-switch-modal';

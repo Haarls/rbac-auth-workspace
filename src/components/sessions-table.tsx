@@ -1,7 +1,7 @@
 'use client';
 
-import type { RoleName } from '@/lib/permissions';
-import { CARD_CLS, fmtUtc, TD_CLS, TH_CLS } from '@/lib/ui';
+import type { RoleName } from '../lib/permissions';
+import { CARD_CLS, fmtUtc, TD_CLS, TH_CLS } from '../lib/ui';
 
 export interface ActiveSessionRow {
   id: string;

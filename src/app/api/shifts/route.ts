@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
-import { requireApiPermission } from '@/lib/auth';
-import { prisma, writeAuditLog } from '@/lib/db';
+import { requireApiPermission } from '../../../lib/auth';
+import { prisma, writeAuditLog } from '../../../lib/db';
 
 const CreateShiftSchema = z.object({
   station: z.string().trim().min(2).max(24),

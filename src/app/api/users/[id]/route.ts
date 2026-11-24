@@ -1,8 +1,8 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
-import { requireApiPermission } from '@/lib/auth';
-import { hashSecret } from '@/lib/crypto';
-import { prisma, writeAuditLog } from '@/lib/db';
+import { requireApiPermission } from '../../../../lib/auth';
+import { hashSecret } from '../../../../lib/crypto';
+import { prisma, writeAuditLog } from '../../../../lib/db';
 
 const UpdateUserSchema = z
   .object({

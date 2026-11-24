@@ -4,7 +4,7 @@ import { Check } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import { z } from 'zod';
-import { apiJson, BTN_PRIMARY, CARD_CLS, fmtUtc, INPUT_CLS, TD_CLS, TH_CLS, type RequestState } from '@/lib/ui';
+import { apiJson, BTN_PRIMARY, CARD_CLS, fmtUtc, INPUT_CLS, TD_CLS, TH_CLS, type RequestState } from '../lib/ui';
 
 export interface ShiftEntryRow {
   id: string;

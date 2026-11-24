@@ -3,9 +3,9 @@
 import { AlertCircle, ArrowRight, Eye, EyeOff, Loader2, ShieldCheck } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { DEMO_ACCOUNTS } from '@/lib/demo-accounts';
-import { ROLE_DOT } from '@/lib/permissions';
-import { apiJson, BTN_PRIMARY, type RequestState } from '@/lib/ui';
+import { DEMO_ACCOUNTS } from '../lib/demo-accounts';
+import { ROLE_DOT } from '../lib/permissions';
+import { apiJson, BTN_PRIMARY, type RequestState } from '../lib/ui';
 import { PinOtpInput } from './pin-otp-input';
 
 const AUTH_MODES = [

@@ -2,8 +2,8 @@
 
 import { useState, type FormEvent } from 'react';
 import { z } from 'zod';
-import { ROLE_DOT, type RoleName } from '@/lib/permissions';
-import { BTN_PRIMARY, CARD_CLS, INPUT_CLS } from '@/lib/ui';
+import { ROLE_DOT, type RoleName } from '../lib/permissions';
+import { BTN_PRIMARY, CARD_CLS, INPUT_CLS } from '../lib/ui';
 import { CustomSelect, type SelectOption } from './custom-select';
 
 export const ROLE_OPTIONS: readonly SelectOption<RoleName>[] = [

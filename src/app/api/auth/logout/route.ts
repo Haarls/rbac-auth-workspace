@@ -1,8 +1,8 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
-import { getActiveSession } from '@/lib/auth';
-import { prisma, writeAuditLog } from '@/lib/db';
-import { SESSION_COOKIE } from '@/lib/jwt';
+import { getActiveSession } from '../../../../lib/auth';
+import { prisma, writeAuditLog } from '../../../../lib/db';
+import { SESSION_COOKIE } from '../../../../lib/jwt';
 
 export async function POST() {
   const ctx = await getActiveSession();

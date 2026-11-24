@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
-import { LoginForm } from '@/components/login-form';
-import { BrandIsotipo } from '@/components/pin-otp-input';
-import { getActiveSession } from '@/lib/auth';
+import { LoginForm } from '../../components/login-form';
+import { BrandIsotipo } from '../../components/pin-otp-input';
+import { getActiveSession } from '../../lib/auth';
 
 export default async function LoginPage() {
   const session = await getActiveSession();

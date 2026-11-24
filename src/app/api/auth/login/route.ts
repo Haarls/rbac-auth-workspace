@@ -1,8 +1,8 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
-import { issueSessionCookie } from '@/lib/auth';
-import { verifySecret } from '@/lib/crypto';
-import { prisma, writeAuditLog } from '@/lib/db';
+import { issueSessionCookie } from '../../../../lib/auth';
+import { verifySecret } from '../../../../lib/crypto';
+import { prisma, writeAuditLog } from '../../../../lib/db';
 
 const LoginSchema = z.object({
   email: z

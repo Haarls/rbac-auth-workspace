@@ -3,8 +3,8 @@
 import { AlertCircle, ArrowRight, Loader2, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ROLE_DOT, type RoleName } from '@/lib/permissions';
-import { apiJson, BTN_GHOST, BTN_PRIMARY, type RequestState } from '@/lib/ui';
+import { ROLE_DOT, type RoleName } from '../lib/permissions';
+import { apiJson, BTN_GHOST, BTN_PRIMARY, type RequestState } from '../lib/ui';
 import { CustomSelect } from './custom-select';
 import { PinOtpInput } from './pin-otp-input';
 

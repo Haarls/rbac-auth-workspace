@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { requireApiPermission } from '@/lib/auth';
-import { prisma, writeAuditLog } from '@/lib/db';
+import { requireApiPermission } from '../../../../../lib/auth';
+import { prisma, writeAuditLog } from '../../../../../lib/db';
 
 export async function POST(_request: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
