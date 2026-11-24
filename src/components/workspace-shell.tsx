@@ -1,18 +1,11 @@
 'use client';
 
-import {
-  CheckCircle2,
-  ClipboardList,
-  KeyRound,
-  LogOut,
-  ScrollText,
-  Search,
-  Shield,
-  Users,
-} from 'lucide-react';
+import { Check, Info, KeyRound, LogOut, Search, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useMemo, useState, type ReactNode } from 'react';
-import { hasPermission, ROLE_BADGE, type RoleName } from '@/lib/permissions';
+import { useMemo, useState } from 'react';
+import { hasPermission, ROLE_DOT, type RoleName } from '@/lib/permissions';
+import { CustomSelect } from './custom-select';
+import { BrandIsotipo } from './pin-otp-input';
 import { PinSwitchModal, type OperatorOption } from './pin-switch-modal';
 import { TeamPanel, type ActiveSessionRow, type TeamMemberRow } from './team-panel';
 
@@ -50,6 +43,9 @@ const ALERT_ACTIONS = new Set(['ACCESS_DENIED_403', 'AUTH_PIN_LOCKED', 'SESSION_
 const WARN_ACTIONS = new Set(['AUTH_PIN_FAILED', 'AUTH_LOGIN_FAILED']);
 const fmtUtc = (iso: string) => iso.slice(0, 19).replace('T', ' ');
 
+const INPUT_CLS =
+  'mt-1.5 h-9 w-full rounded-lg border border-white/[0.09] bg-[#0C0C0E] px-3 text-xs text-zinc-100 transition-all placeholder:text-zinc-600 hover:border-white/[0.16] focus:border-white/30 focus:outline-none focus:ring-2 focus:ring-white/[0.06]';
+
 export function WorkspaceShell({
   currentUser,
   pinOperators,
@@ -67,6 +63,8 @@ export function WorkspaceShell({
 
   const [tab, setTab] = useState<TabKey>('SHIFTS');
   const [pinModalOpen, setPinModalOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
+
   const [station, setStation] = useState('REG-01');
   const [summary, setSummary] = useState('');
   const [cashDeltaUsd, setCashDeltaUsd] = useState('0.00');
@@ -75,10 +73,21 @@ export function WorkspaceShell({
   const [auditActionFilter, setAuditActionFilter] = useState('ALL');
   const [auditQuery, setAuditQuery] = useState('');
 
-  const auditActions = useMemo(
-    () => ['ALL', ...Array.from(new Set(audits.map((a) => a.action))).sort()],
-    [audits],
-  );
+  const auditActionOptions = useMemo(() => {
+    const unique = Array.from(new Set(audits.map((a) => a.action))).sort();
+    return [
+      { value: 'ALL', label: 'All events' },
+      ...unique.map((act) => ({
+        value: act,
+        label: act,
+        dotClass: ALERT_ACTIONS.has(act)
+          ? 'bg-red-400'
+          : WARN_ACTIONS.has(act)
+            ? 'bg-amber-400'
+            : 'bg-zinc-500',
+      })),
+    ];
+  }, [audits]);
 
   const filteredAudits = useMemo(() => {
     const q = auditQuery.trim().toLowerCase();
@@ -94,26 +103,18 @@ export function WorkspaceShell({
     });
   }, [audits, auditActionFilter, auditQuery]);
 
-  const navTabs: Array<{ id: TabKey; label: string; icon: ReactNode }> = [
-    { id: 'SHIFTS', label: 'Shift Operations', icon: <ClipboardList className="h-3.5 w-3.5" /> },
+  const navTabs: Array<{ id: TabKey; label: string; count?: number }> = [
+    { id: 'SHIFTS', label: 'Shift operations', count: shifts.length },
     ...(canReadTeam
       ? [
           {
             id: 'TEAM' as const,
-            label: canManageTeam ? 'Team & Sessions' : 'Team Directory',
-            icon: <Users className="h-3.5 w-3.5" />,
+            label: canManageTeam ? 'Team & sessions' : 'Team directory',
+            count: members.length,
           },
         ]
       : []),
-    ...(canReadAudit
-      ? [
-          {
-            id: 'AUDIT' as const,
-            label: `Audit Log (${audits.length})`,
-            icon: <ScrollText className="h-3.5 w-3.5" />,
-          },
-        ]
-      : []),
+    ...(canReadAudit ? [{ id: 'AUDIT' as const, label: 'Audit log', count: audits.length }] : []),
   ];
 
   const activeTab: TabKey = navTabs.some((t) => t.id === tab) ? tab : 'SHIFTS';
@@ -147,36 +148,54 @@ export function WorkspaceShell({
   }
 
   return (
-    <div className="min-h-screen bg-canvas">
-      <header className="border-b border-line bg-surface">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="inline-flex items-center gap-2 font-mono text-sm font-semibold tracking-tight text-ink">
-              <Shield className="h-4 w-4 text-accent" aria-hidden="true" />
-              <span>Haarls / Ops Workspace</span>
+    <div className="min-h-screen overflow-x-clip">
+      <header className="border-b border-white/[0.08] bg-[#09090B]/90 backdrop-blur-sm">
+        <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+          <div className="flex min-w-0 flex-wrap items-center gap-2.5">
+            <div className="flex items-center gap-2.5">
+              <BrandIsotipo size="sm" />
+              <span className="text-[13px] font-medium tracking-[-0.015em] text-zinc-100">
+                Haarls <span className="text-zinc-600">/</span> Workspace
+              </span>
             </div>
-            <span
-              className={`rounded border px-2 py-0.5 font-mono text-[11px] font-semibold ${ROLE_BADGE[currentUser.role]}`}
-            >
-              {currentUser.role}
+
+            <span className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.08] bg-[#111113] px-2 py-0.5 font-mono text-[11px] font-medium text-zinc-200 shadow-card">
+              <span className={`h-1.5 w-1.5 rounded-full ${ROLE_DOT[currentUser.role]}`} />
+              <span>{currentUser.role}</span>
             </span>
-            <span className="text-xs text-muted">
-              {currentUser.name} <span className="font-mono">({currentUser.email})</span> · via{' '}
-              <span className="font-mono">{currentUser.authMethod}</span>
+
+            <span className="truncate text-xs text-zinc-500">
+              {currentUser.name}{' '}
+              <span className="hidden font-mono sm:inline">· {currentUser.email}</span>
             </span>
           </div>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              aria-expanded={aboutOpen}
+              onClick={() => setAboutOpen((prev) => !prev)}
+              className={`inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium transition-colors ${
+                aboutOpen
+                  ? 'border-white/[0.18] bg-white/[0.07] text-zinc-100'
+                  : 'border-white/[0.08] bg-[#111113] text-zinc-400 hover:border-white/[0.16] hover:text-zinc-200'
+              }`}
+            >
+              <Info className="h-3.5 w-3.5 text-[#4ECDC4]" aria-hidden="true" />
+              <span>About this sandbox</span>
+            </button>
+
             {pinOperators.length > 0 && (
               <button
                 type="button"
                 onClick={() => setPinModalOpen(true)}
-                className="inline-flex h-9 items-center gap-2 rounded-lg border border-line bg-canvas px-3.5 text-xs font-medium text-ink transition-colors hover:border-accent/60"
+                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-white/[0.08] bg-[#111113] px-3 text-xs font-medium text-zinc-300 shadow-card transition-colors hover:border-white/[0.16] hover:bg-white/[0.03] hover:text-zinc-100"
               >
-                <KeyRound className="h-3.5 w-3.5 text-muted" aria-hidden="true" />
-                <span>Switch Operator</span>
+                <KeyRound className="h-3.5 w-3.5 text-zinc-500" aria-hidden="true" />
+                <span>Switch PIN</span>
               </button>
             )}
+
             <button
               type="button"
               onClick={async () => {
@@ -184,50 +203,108 @@ export function WorkspaceShell({
                 router.push('/login');
                 router.refresh();
               }}
-              className="inline-flex h-9 items-center gap-2 rounded-lg border border-line px-3.5 text-xs font-medium text-muted transition-colors hover:text-ink"
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-white/[0.08] bg-[#111113] px-3 text-xs font-medium text-zinc-400 transition-colors hover:border-white/[0.16] hover:text-zinc-200"
             >
-              <LogOut className="h-3.5 w-3.5" aria-hidden="true" />
-              <span>Sign Out</span>
+              <LogOut className="h-3.5 w-3.5 text-zinc-500" aria-hidden="true" />
+              <span>Sign out</span>
             </button>
           </div>
         </div>
 
-        <div className="border-t border-line/60">
-          <nav
-            aria-label="Workspace sections"
-            className="mx-auto flex max-w-6xl gap-2 px-6 py-2 text-xs font-medium"
-          >
-            {navTabs.map((item) => (
+        {aboutOpen && (
+          <div className="border-t border-white/[0.06] bg-[#111113]/90">
+            <div className="mx-auto max-w-6xl px-4 py-4 sm:px-6">
+              <div className="flex items-start justify-between gap-4">
+                <div className="grid gap-4 text-xs leading-relaxed text-zinc-400 md:grid-cols-3">
+                  <div>
+                    <p className="font-medium text-zinc-200">1. Hybrid Shift Authentication</p>
+                    <p className="mt-1">
+                      Combines <code className="font-mono text-zinc-300">HttpOnly</code> HS256 JWT
+                      cookies with <code className="font-mono text-zinc-300">scrypt</code>-hashed
+                      4-digit Station PINs and a 5-strike PostgreSQL lockout for shared POS/ops
+                      terminals.
+                    </p>
+                  </div>
+                  <div>
+                    <p className="font-medium text-zinc-200">2. Server-Enforced RBAC &amp; Revocation</p>
+                    <p className="mt-1">
+                      Every Route Handler resolves live <code className="font-mono text-zinc-300">User.role</code>{' '}
+                      and active <code className="font-mono text-zinc-300">Session</code> rows from
+                      Neon PostgreSQL—role demotions and session revocations apply on the very next
+                      request.
+                    </p>
+                  </div>
+                  <div>
+                    <p className="font-medium text-zinc-200">3. How to Test HTTP 403 &amp; Audit Log</p>
+                    <p className="mt-1">
+                      Click <span className="text-zinc-200">Switch PIN</span> → choose{' '}
+                      <span className="font-mono text-zinc-200">Mateo Silva (STAFF)</span> with PIN{' '}
+                      <span className="tabular-nums font-mono text-zinc-200">3096</span>. Calling{' '}
+                      <code className="font-mono text-zinc-300">/api/users</code> returns{' '}
+                      <span className="font-mono text-red-400">403 Forbidden</span> and records{' '}
+                      <code className="font-mono text-zinc-300">ACCESS_DENIED_403</code> (switch back
+                      to <span className="tabular-nums font-mono text-zinc-200">1042</span> to inspect).
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  aria-label="Close sandbox overview"
+                  onClick={() => setAboutOpen(false)}
+                  className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded text-zinc-500 hover:bg-white/[0.05] hover:text-zinc-200"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <nav
+          aria-label="Workspace sections"
+          className="no-scrollbar mx-auto flex max-w-6xl gap-5 overflow-x-auto whitespace-nowrap px-4 text-[13px] sm:px-6"
+        >
+          {navTabs.map((item) => {
+            const active = activeTab === item.id;
+            return (
               <button
                 key={item.id}
                 type="button"
                 onClick={() => setTab(item.id)}
-                className={`tabular-nums inline-flex h-8 items-center gap-2 rounded-md px-3 transition-colors ${
-                  activeTab === item.id
-                    ? 'bg-line text-ink'
-                    : 'text-muted hover:bg-canvas/60 hover:text-ink'
+                className={`inline-flex shrink-0 items-center gap-2 border-b-2 pb-2.5 pt-1 font-medium transition-colors ${
+                  active
+                    ? 'border-zinc-100 text-zinc-100'
+                    : 'border-transparent text-zinc-500 hover:text-zinc-300'
                 }`}
               >
-                {item.icon}
                 <span>{item.label}</span>
+                {item.count !== undefined && (
+                  <span className="tabular-nums rounded bg-white/[0.05] px-1.5 py-0.5 font-mono text-[10px] text-zinc-400">
+                    {item.count}
+                  </span>
+                )}
               </button>
-            ))}
-          </nav>
-        </div>
+            );
+          })}
+        </nav>
       </header>
 
-      <main className="mx-auto max-w-6xl px-6 py-8">
+      <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
         {activeTab === 'SHIFTS' && (
           <div className="space-y-6">
-            <section className="rounded-xl border border-line bg-surface p-6">
-              <h2 className="text-sm font-semibold text-ink">Record Shift Entry</h2>
-              <p className="mt-0.5 text-xs text-muted">
-                Log cash drawer movements, handoffs, or station settlements into the operational ledger.
-              </p>
+            <section className="rounded-xl border border-white/[0.08] bg-[#111113] p-5 shadow-card sm:p-6">
+              <div>
+                <h2 className="text-sm font-medium tracking-[-0.015em] text-zinc-100">
+                  Record shift entry
+                </h2>
+                <p className="mt-0.5 text-[13px] text-zinc-400">
+                  Log register floats, cash variances, or handoff notes into the ledger.
+                </p>
+              </div>
 
-              <form onSubmit={handleCreateShift} className="mt-5 grid gap-4 sm:grid-cols-12">
+              <form onSubmit={handleCreateShift} className="mt-5 grid gap-3.5 sm:grid-cols-12">
                 <div className="sm:col-span-2">
-                  <label htmlFor="shift-station" className="block text-xs font-medium text-muted">
+                  <label htmlFor="shift-station" className="block text-xs font-medium text-zinc-400">
                     Station
                   </label>
                   <input
@@ -235,12 +312,12 @@ export function WorkspaceShell({
                     required
                     value={station}
                     onChange={(e) => setStation(e.target.value)}
-                    className="mt-1.5 h-10 w-full rounded-lg border border-line bg-canvas px-3 font-mono text-xs text-ink"
+                    className={`${INPUT_CLS} font-mono`}
                   />
                 </div>
                 <div className="sm:col-span-6">
-                  <label htmlFor="shift-summary" className="block text-xs font-medium text-muted">
-                    Operational Note
+                  <label htmlFor="shift-summary" className="block text-xs font-medium text-zinc-400">
+                    Operational note
                   </label>
                   <input
                     id="shift-summary"
@@ -249,12 +326,12 @@ export function WorkspaceShell({
                     value={summary}
                     onChange={(e) => setSummary(e.target.value)}
                     placeholder="Opening float verified / supplier COD settlement"
-                    className="mt-1.5 h-10 w-full rounded-lg border border-line bg-canvas px-3 text-xs text-ink placeholder:text-muted"
+                    className={INPUT_CLS}
                   />
                 </div>
                 <div className="sm:col-span-2">
-                  <label htmlFor="shift-delta" className="block text-xs font-medium text-muted">
-                    Cash Delta (USD)
+                  <label htmlFor="shift-delta" className="block text-xs font-medium text-zinc-400">
+                    Cash delta (USD)
                   </label>
                   <input
                     id="shift-delta"
@@ -262,77 +339,93 @@ export function WorkspaceShell({
                     required
                     value={cashDeltaUsd}
                     onChange={(e) => setCashDeltaUsd(e.target.value)}
-                    className="tabular-nums mt-1.5 h-10 w-full rounded-lg border border-line bg-canvas px-3 font-mono text-xs text-ink"
+                    className={`${INPUT_CLS} tabular-nums font-mono`}
                   />
                 </div>
                 <div className="flex items-end sm:col-span-2">
                   <button
                     type="submit"
                     disabled={shiftBusy}
-                    className="h-10 w-full rounded-lg bg-accent px-4 text-xs font-semibold text-canvas transition-opacity hover:opacity-90 disabled:opacity-50"
+                    className="h-9 w-full rounded-lg bg-zinc-100 px-4 text-xs font-medium text-zinc-950 shadow-sm transition-all hover:bg-white active:scale-[0.99] disabled:opacity-40"
                   >
-                    {shiftBusy ? 'Saving...' : 'Log Entry'}
+                    {shiftBusy ? 'Saving...' : 'Log entry'}
                   </button>
                 </div>
               </form>
               {shiftError && (
-                <p role="alert" className="mt-3 text-xs text-danger">
+                <p role="alert" className="mt-3 text-xs text-red-400">
                   {shiftError}
                 </p>
               )}
             </section>
 
-            <section className="overflow-hidden rounded-xl border border-line bg-surface">
-              <div className="flex items-center justify-between border-b border-line px-6 py-4">
+            <section className="overflow-hidden rounded-xl border border-white/[0.08] bg-[#111113] shadow-card">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/[0.08] px-5 py-4 sm:px-6">
                 <div>
-                  <h2 className="text-sm font-semibold text-ink">Recent Shift Ledger</h2>
-                  <p className="mt-0.5 text-xs text-muted">
+                  <h2 className="text-sm font-medium tracking-[-0.015em] text-zinc-100">
+                    Shift ledger
+                  </h2>
+                  <p className="mt-0.5 text-[13px] text-zinc-400">
                     Ordered newest first. Managers and Owners can reconcile open entries.
                   </p>
                 </div>
-                <span className="tabular-nums rounded-md border border-line bg-canvas px-2.5 py-1 font-mono text-xs text-muted">
+                <span className="tabular-nums font-mono text-xs text-zinc-500">
                   {shifts.length} entries
                 </span>
               </div>
 
               {shifts.length === 0 ? (
-                <p className="px-6 py-8 text-xs text-muted">No shift entries recorded yet.</p>
+                <p className="px-6 py-8 text-xs text-zinc-500">No shift entries recorded yet.</p>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
-                    <thead className="border-b border-line bg-canvas/40 text-muted">
+                    <thead className="border-b border-white/[0.08] text-[11px] font-medium text-zinc-500">
                       <tr>
-                        <th className="px-6 py-3 font-medium">Timestamp (UTC)</th>
-                        <th className="px-6 py-3 font-medium">Station</th>
-                        <th className="px-6 py-3 font-medium">Summary</th>
-                        <th className="px-6 py-3 font-medium">Operator</th>
-                        <th className="px-6 py-3 text-right font-medium">Cash Delta</th>
-                        <th className="px-6 py-3 text-right font-medium">Status</th>
+                        <th className="whitespace-nowrap px-5 py-3 font-medium sm:px-6">
+                          Timestamp (UTC)
+                        </th>
+                        <th className="whitespace-nowrap px-5 py-3 font-medium sm:px-6">Station</th>
+                        <th className="whitespace-nowrap px-5 py-3 font-medium sm:px-6">Summary</th>
+                        <th className="whitespace-nowrap px-5 py-3 font-medium sm:px-6">
+                          Operator
+                        </th>
+                        <th className="whitespace-nowrap px-5 py-3 text-right font-medium sm:px-6">
+                          Cash delta
+                        </th>
+                        <th className="whitespace-nowrap px-5 py-3 text-right font-medium sm:px-6">
+                          State
+                        </th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-line">
+                    <tbody className="divide-y divide-white/[0.06]">
                       {shifts.map((s) => {
                         const usd = s.cashDeltaCents / 100;
                         return (
-                          <tr key={s.id} className="transition-colors hover:bg-canvas/30">
-                            <td className="tabular-nums whitespace-nowrap px-6 py-4 font-mono text-muted">
+                          <tr key={s.id} className="transition-colors hover:bg-white/[0.02]">
+                            <td className="tabular-nums whitespace-nowrap px-5 py-3.5 font-mono text-zinc-500 sm:px-6">
                               {fmtUtc(s.createdAt)}
                             </td>
-                            <td className="px-6 py-4 font-mono font-medium text-ink">{s.station}</td>
-                            <td className="px-6 py-4 text-ink">{s.summary}</td>
-                            <td className="px-6 py-4 font-mono text-muted">{s.authorEmail}</td>
+                            <td className="whitespace-nowrap px-5 py-3.5 font-mono text-zinc-200 sm:px-6">
+                              {s.station}
+                            </td>
+                            <td className="whitespace-nowrap px-5 py-3.5 text-[13px] text-zinc-200 sm:px-6">
+                              {s.summary}
+                            </td>
+                            <td className="whitespace-nowrap px-5 py-3.5 font-mono text-zinc-500 sm:px-6">
+                              {s.authorEmail}
+                            </td>
                             <td
-                              className={`tabular-nums px-6 py-4 text-right font-mono font-medium ${
-                                usd < 0 ? 'text-warn' : 'text-ink'
+                              className={`tabular-nums whitespace-nowrap px-5 py-3.5 text-right font-mono font-medium sm:px-6 ${
+                                usd < 0 ? 'text-amber-400' : 'text-zinc-200'
                               }`}
                             >
                               {usd >= 0 ? `+$${usd.toFixed(2)}` : `-$${Math.abs(usd).toFixed(2)}`}
                             </td>
-                            <td className="px-6 py-4 text-right">
+                            <td className="whitespace-nowrap px-5 py-3.5 text-right sm:px-6">
                               {s.status === 'VERIFIED' ? (
-                                <span className="inline-flex items-center gap-1 rounded border border-ok/30 bg-ok/10 px-2 py-0.5 font-mono text-[11px] text-ok">
-                                  <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
-                                  <span>VERIFIED</span>
+                                <span className="inline-flex items-center gap-1 font-mono text-[11px] text-zinc-300">
+                                  <Check className="h-3.5 w-3.5 text-[#4ECDC4]" aria-hidden="true" />
+                                  <span>Verified</span>
                                 </span>
                               ) : canVerifyShift ? (
                                 <button
@@ -343,13 +436,13 @@ export function WorkspaceShell({
                                     });
                                     if (r.ok) router.refresh();
                                   }}
-                                  className="h-8 rounded-md border border-line bg-canvas px-3 font-mono text-xs text-ink transition-colors hover:border-accent"
+                                  className="h-7 rounded-md border border-white/[0.09] bg-[#0C0C0E] px-2.5 font-medium text-zinc-300 transition-colors hover:border-white/[0.20] hover:text-zinc-100"
                                 >
                                   Verify
                                 </button>
                               ) : (
-                                <span className="inline-block rounded border border-warn/30 bg-warn/10 px-2 py-0.5 font-mono text-[11px] text-warn">
-                                  OPEN
+                                <span className="font-mono text-[11px] text-amber-400/90">
+                                  Open
                                 </span>
                               )}
                             </td>
@@ -374,34 +467,30 @@ export function WorkspaceShell({
         )}
 
         {activeTab === 'AUDIT' && canReadAudit && (
-          <section className="overflow-hidden rounded-xl border border-line bg-surface">
-            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line px-6 py-4">
+          <section className="overflow-hidden rounded-xl border border-white/[0.08] bg-[#111113] shadow-card">
+            <div className="flex flex-col gap-3 border-b border-white/[0.08] px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
               <div>
-                <h2 className="text-sm font-semibold text-ink">Security &amp; Operations Audit</h2>
-                <p className="mt-0.5 text-xs text-muted">
-                  Immutable log of logins, PIN switches, role mutations, and HTTP 403 denials.
+                <h2 className="text-sm font-medium tracking-[-0.015em] text-zinc-100">
+                  Security &amp; operations audit
+                </h2>
+                <p className="mt-0.5 text-[13px] text-zinc-400">
+                  Append-only trail of logins, PIN unlocks, role updates, and 403 denials.
                 </p>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2.5">
-                <label htmlFor="audit-action" className="sr-only">
-                  Filter by action
-                </label>
-                <select
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <CustomSelect
                   id="audit-action"
+                  ariaLabel="Filter audit log by event type"
                   value={auditActionFilter}
-                  onChange={(e) => setAuditActionFilter(e.target.value)}
-                  className="h-9 rounded-lg border border-line bg-canvas px-3 font-mono text-xs text-ink"
-                >
-                  {auditActions.map((act) => (
-                    <option key={act} value={act}>
-                      {act}
-                    </option>
-                  ))}
-                </select>
-                <div className="relative">
+                  options={auditActionOptions}
+                  onChange={setAuditActionFilter}
+                  mono
+                  className="w-full sm:w-auto sm:min-w-[195px]"
+                />
+                <div className="relative w-full sm:w-60">
                   <Search
-                    className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted"
+                    className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-500"
                     aria-hidden="true"
                   />
                   <label htmlFor="audit-search" className="sr-only">
@@ -413,50 +502,61 @@ export function WorkspaceShell({
                     value={auditQuery}
                     onChange={(e) => setAuditQuery(e.target.value)}
                     placeholder="Filter actor, target, detail..."
-                    className="h-9 w-60 rounded-lg border border-line bg-canvas pl-8 pr-3 text-xs text-ink placeholder:text-muted"
+                    className="h-9 w-full rounded-lg border border-white/[0.09] bg-[#0C0C0E] pl-8 pr-3 text-xs text-zinc-100 transition-all placeholder:text-zinc-600 hover:border-white/[0.16] focus:border-white/30 focus:outline-none focus:ring-2 focus:ring-white/[0.06]"
                   />
                 </div>
               </div>
             </div>
 
             {filteredAudits.length === 0 ? (
-              <p className="px-6 py-8 text-xs text-muted">
+              <p className="px-6 py-8 text-xs text-zinc-500">
                 No audit events match the active filter.
               </p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
-                  <thead className="border-b border-line bg-canvas/40 text-muted">
+                  <thead className="border-b border-white/[0.08] text-[11px] font-medium text-zinc-500">
                     <tr>
-                      <th className="px-6 py-3 font-medium">Timestamp (UTC)</th>
-                      <th className="px-6 py-3 font-medium">Action</th>
-                      <th className="px-6 py-3 font-medium">Actor</th>
-                      <th className="px-6 py-3 font-medium">Target</th>
-                      <th className="px-6 py-3 font-medium">Detail</th>
+                      <th className="whitespace-nowrap px-5 py-3 font-medium sm:px-6">
+                        Timestamp (UTC)
+                      </th>
+                      <th className="whitespace-nowrap px-5 py-3 font-medium sm:px-6">Event</th>
+                      <th className="whitespace-nowrap px-5 py-3 font-medium sm:px-6">Actor</th>
+                      <th className="whitespace-nowrap px-5 py-3 font-medium sm:px-6">Target</th>
+                      <th className="whitespace-nowrap px-5 py-3 font-medium sm:px-6">Detail</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-line">
+                  <tbody className="divide-y divide-white/[0.06]">
                     {filteredAudits.map((a) => {
-                      const badgeTone = ALERT_ACTIONS.has(a.action)
-                        ? 'border-danger/40 bg-danger/10 text-danger'
-                        : WARN_ACTIONS.has(a.action)
-                          ? 'border-warn/30 bg-warn/10 text-warn'
-                          : 'border-line bg-canvas text-ink';
+                      const isAlert = ALERT_ACTIONS.has(a.action);
+                      const isWarn = WARN_ACTIONS.has(a.action);
                       return (
-                        <tr key={a.id} className="transition-colors hover:bg-canvas/30">
-                          <td className="tabular-nums whitespace-nowrap px-6 py-4 font-mono text-muted">
+                        <tr key={a.id} className="transition-colors hover:bg-white/[0.02]">
+                          <td className="tabular-nums whitespace-nowrap px-5 py-3.5 font-mono text-zinc-500 sm:px-6">
                             {fmtUtc(a.createdAt)}
                           </td>
-                          <td className="whitespace-nowrap px-6 py-4">
+                          <td className="whitespace-nowrap px-5 py-3.5 sm:px-6">
                             <span
-                              className={`inline-block rounded border px-2 py-0.5 font-mono text-[11px] font-medium ${badgeTone}`}
+                              className={`inline-block rounded border px-1.5 py-0.5 font-mono text-[11px] ${
+                                isAlert
+                                  ? 'border-red-500/25 bg-red-500/[0.06] text-red-400'
+                                  : isWarn
+                                    ? 'border-amber-500/25 bg-amber-500/[0.06] text-amber-400'
+                                    : 'border-white/[0.08] bg-white/[0.03] text-zinc-300'
+                              }`}
                             >
                               {a.action}
                             </span>
                           </td>
-                          <td className="px-6 py-4 font-mono text-muted">{a.actorEmail}</td>
-                          <td className="tabular-nums px-6 py-4 font-mono text-ink">{a.target}</td>
-                          <td className="px-6 py-4 leading-relaxed text-muted">{a.detail}</td>
+                          <td className="whitespace-nowrap px-5 py-3.5 font-mono text-zinc-400 sm:px-6">
+                            {a.actorEmail}
+                          </td>
+                          <td className="tabular-nums whitespace-nowrap px-5 py-3.5 font-mono text-zinc-200 sm:px-6">
+                            {a.target}
+                          </td>
+                          <td className="whitespace-nowrap px-5 py-3.5 text-zinc-400 sm:px-6">
+                            {a.detail}
+                          </td>
                         </tr>
                       );
                     })}

@@ -1,9 +1,11 @@
 'use client';
 
-import { AlertCircle, Delete, KeyRound, Loader2, X } from 'lucide-react';
+import { AlertCircle, ArrowRight, Loader2, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
-import type { RoleName } from '@/lib/permissions';
+import { useEffect, useMemo, useState } from 'react';
+import { ROLE_DOT, type RoleName } from '@/lib/permissions';
+import { CustomSelect } from './custom-select';
+import { PinOtpInput } from './pin-otp-input';
 
 export interface OperatorOption {
   email: string;
@@ -18,17 +20,24 @@ interface PinSwitchModalProps {
   currentEmail: string;
 }
 
-const PAD_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'CLR', '0', 'DEL'] as const;
-
 export function PinSwitchModal({ open, onClose, operators, currentEmail }: PinSwitchModalProps) {
   const router = useRouter();
-  const pinInputRef = useRef<HTMLInputElement>(null);
   const [selectedEmail, setSelectedEmail] = useState<string>(
     operators.find((o) => o.email !== currentEmail)?.email ?? operators[0]?.email ?? '',
   );
   const [pin, setPin] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+
+  const selectOptions = useMemo(
+    () =>
+      operators.map((op) => ({
+        value: op.email,
+        label: `${op.name} (${op.role})`,
+        dotClass: ROLE_DOT[op.role],
+      })),
+    [operators],
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -37,42 +46,30 @@ export function PinSwitchModal({ open, onClose, operators, currentEmail }: PinSw
     const defaultTarget =
       operators.find((o) => o.email !== currentEmail)?.email ?? operators[0]?.email ?? '';
     setSelectedEmail(defaultTarget);
-    const id = requestAnimationFrame(() => pinInputRef.current?.focus());
 
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') onClose();
     }
     window.addEventListener('keydown', onKeyDown);
-    return () => {
-      cancelAnimationFrame(id);
-      window.removeEventListener('keydown', onKeyDown);
-    };
+    return () => window.removeEventListener('keydown', onKeyDown);
   }, [open, currentEmail, operators, onClose]);
 
   if (!open) return null;
 
-  function handlePadPress(key: (typeof PAD_KEYS)[number]) {
-    setError(null);
-    if (key === 'CLR') setPin('');
-    else if (key === 'DEL') setPin((prev) => prev.slice(0, -1));
-    else setPin((prev) => (prev.length < 6 ? prev + key : prev));
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function submitPinSwitch(pinCode: string) {
+    if (pending || pinCode.length < 4) return;
     setError(null);
     setPending(true);
     try {
       const res = await fetch('/api/auth/pin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: selectedEmail, pin }),
+        body: JSON.stringify({ email: selectedEmail, pin: pinCode }),
       });
       const data = (await res.json()) as { error?: string };
       if (!res.ok) {
         setError(data.error ?? `PIN switch failed (HTTP ${res.status}).`);
         setPin('');
-        pinInputRef.current?.focus();
         return;
       }
       onClose();
@@ -86,7 +83,7 @@ export function PinSwitchModal({ open, onClose, operators, currentEmail }: PinSw
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-canvas/85 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-[2px]"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -95,121 +92,107 @@ export function PinSwitchModal({ open, onClose, operators, currentEmail }: PinSw
         role="dialog"
         aria-modal="true"
         aria-labelledby="pin-switch-title"
-        className="w-full max-w-md rounded-xl border border-line bg-surface p-6"
+        className="w-full max-w-[360px] rounded-2xl border border-white/[0.08] bg-[#111113] p-5 shadow-elevated sm:p-6"
       >
-        <div className="flex items-center justify-between border-b border-line pb-4">
-          <div className="flex items-center gap-2.5">
-            <KeyRound className="h-4 w-4 text-accent" aria-hidden="true" />
-            <h2 id="pin-switch-title" className="text-base font-semibold text-ink">
-              Switch Station Operator
+        <div className="flex items-start justify-between">
+          <div>
+            <h2
+              id="pin-switch-title"
+              className="text-base font-medium tracking-[-0.02em] text-zinc-100"
+            >
+              Switch operator
             </h2>
+            <p className="mt-0.5 text-xs text-zinc-400">
+              Select an operator and enter their 4-digit PIN
+            </p>
           </div>
           <button
             type="button"
             aria-label="Close modal"
             onClick={onClose}
-            className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted hover:bg-canvas hover:text-ink"
+            className="inline-flex h-7 w-7 items-center justify-center rounded-md text-zinc-500 transition-colors hover:bg-white/[0.04] hover:text-zinc-200"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="mt-5 space-y-4">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            void submitPinSwitch(pin);
+          }}
+          className="mt-5 space-y-4"
+        >
           <div>
-            <label htmlFor="switch-operator" className="block text-xs font-medium text-muted">
-              Target Operator
+            <label htmlFor="switch-operator" className="block text-xs font-medium text-zinc-400">
+              Operator
             </label>
-            <select
-              id="switch-operator"
-              value={selectedEmail}
-              onChange={(e) => {
-                setSelectedEmail(e.target.value);
-                setError(null);
-              }}
-              className="mt-1.5 h-11 w-full rounded-lg border border-line bg-canvas px-3.5 text-sm text-ink transition-colors"
-            >
-              {operators.map((op) => (
-                <option key={op.email} value={op.email}>
-                  {op.name} ({op.role}) — {op.email}
-                </option>
-              ))}
-            </select>
+            <div className="mt-1.5">
+              <CustomSelect
+                id="switch-operator"
+                ariaLabel="Select target operator"
+                value={selectedEmail}
+                options={selectOptions}
+                onChange={(next) => {
+                  setSelectedEmail(next);
+                  setPin('');
+                  setError(null);
+                }}
+                className="h-10 w-full text-[13px]"
+              />
+            </div>
           </div>
 
           <div>
-            <div className="flex items-center justify-between">
-              <label htmlFor="switch-pin" className="block text-xs font-medium text-muted">
-                Operator PIN (4–6 digits)
-              </label>
-              <span className="tabular-nums font-mono text-xs text-muted">{pin.length}/6</span>
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-xs font-medium text-zinc-400">Station PIN</span>
+              <span className="font-mono text-[11px] text-zinc-500">4 digits</span>
             </div>
-            <div className="relative mt-1.5">
-              <KeyRound
-                className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted"
-                aria-hidden="true"
-              />
-              <input
-                ref={pinInputRef}
-                id="switch-pin"
-                type="password"
-                inputMode="numeric"
-                pattern="\d{4,6}"
-                maxLength={6}
-                required
-                value={pin}
-                onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                className="tabular-nums h-12 w-full rounded-lg border border-line bg-canvas pl-10 pr-3.5 font-mono text-lg tracking-[0.4em] text-ink transition-colors placeholder:tracking-normal placeholder:text-muted"
-                placeholder="••••"
-              />
-            </div>
-
-            <div role="group" aria-label="PIN keypad" className="mt-3 grid grid-cols-3 gap-2">
-              {PAD_KEYS.map((key) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => handlePadPress(key)}
-                  className={`tabular-nums inline-flex h-9 items-center justify-center rounded-lg border border-line bg-canvas font-mono transition-colors hover:border-accent/60 active:bg-line ${
-                    key === 'CLR' ? 'text-xs font-medium text-muted' : 'text-sm font-medium text-ink'
-                  }`}
-                >
-                  {key === 'CLR' ? (
-                    'Clear'
-                  ) : key === 'DEL' ? (
-                    <Delete className="h-4 w-4 text-muted" aria-hidden="true" />
-                  ) : (
-                    key
-                  )}
-                </button>
-              ))}
-            </div>
+            <PinOtpInput
+              value={pin}
+              onChange={(next) => {
+                setPin(next);
+                if (error) setError(null);
+              }}
+              onComplete={(code) => {
+                void submitPinSwitch(code);
+              }}
+              disabled={pending}
+              autoFocus
+            />
           </div>
 
           {error && (
             <div
               role="alert"
-              className="tabular-nums flex items-center gap-2 rounded-lg border border-danger/40 bg-canvas px-3.5 py-2.5 text-xs text-danger"
+              className="tabular-nums flex items-center gap-2 rounded-lg border border-red-500/25 bg-red-500/[0.06] px-3 py-2 text-xs text-red-400"
             >
-              <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
+              <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
               <span>{error}</span>
             </div>
           )}
 
-          <div className="flex justify-end gap-2.5 pt-2">
+          <div className="flex justify-end gap-2 pt-1">
             <button
               type="button"
               onClick={onClose}
-              className="h-10 rounded-lg border border-line px-4 text-xs font-medium text-muted transition-colors hover:text-ink"
+              className="h-9 rounded-lg border border-white/[0.08] bg-[#111113] px-3.5 text-xs font-medium text-zinc-300 transition-colors hover:border-white/[0.16] hover:bg-white/[0.03] hover:text-zinc-100"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={pending || pin.length < 4}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-accent px-4 text-xs font-semibold text-canvas transition-opacity hover:opacity-90 disabled:opacity-50"
+              className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-zinc-100 px-3.5 text-xs font-medium text-zinc-950 shadow-sm transition-all hover:bg-white active:scale-[0.99] disabled:pointer-events-none disabled:opacity-40"
             >
-              {pending && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
-              <span>{pending ? 'Switching...' : 'Switch Shift'}</span>
+              {pending ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+              ) : (
+                <>
+                  <span>Unlock</span>
+                  <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+                </>
+              )}
             </button>
           </div>
         </form>

@@ -5,15 +5,18 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        canvas: '#0B0F14',
-        surface: '#121821',
-        line: '#1E293B',
-        ink: '#F1F5F9',
-        muted: '#94A3B8',
+        canvas: '#09090B',
+        surface: '#111113',
+        field: '#0C0C0E',
         accent: '#4ECDC4',
-        ok: '#10B981',
-        warn: '#F59E0B',
-        danger: '#EF4444',
+      },
+      spacing: {
+        13: '3.25rem',
+      },
+      boxShadow: {
+        card: 'inset 0 1px 0 0 rgba(255, 255, 255, 0.06)',
+        elevated:
+          'inset 0 1px 0 0 rgba(255, 255, 255, 0.06), 0 24px 48px -12px rgba(0, 0, 0, 0.7)',
       },
     },
   },

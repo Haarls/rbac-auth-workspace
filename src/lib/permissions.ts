@@ -33,8 +33,8 @@ export function requiredRoleLabel(permission: Permission): RoleName {
   return 'OWNER';
 }
 
-export const ROLE_BADGE: Record<RoleName, string> = {
-  OWNER: 'border-accent/30 bg-accent/10 text-accent',
-  MANAGER: 'border-line bg-line/80 text-ink',
-  STAFF: 'border-line bg-canvas text-muted',
+export const ROLE_DOT: Record<RoleName, string> = {
+  OWNER: 'bg-[#4ECDC4]',
+  MANAGER: 'bg-zinc-300',
+  STAFF: 'bg-zinc-500',
 };
