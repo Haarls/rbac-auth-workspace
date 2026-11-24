@@ -1,5 +1,7 @@
 # rbac-auth-workspace
 
+> **Live Demo:** [https://rbac.haarls.dev](https://rbac.haarls.dev) — Each visitor automatically receives an isolated 6-hour ephemeral PostgreSQL sandbox (`sandbox_id` HttpOnly cookie) with pre-seeded demo accounts.
+
 In physical retail, warehouse, and POS operations, multiple employees share the same workstation across shifts: signing out and typing full email/password credentials every ten minutes slows down the floor, while leaving a single manager account logged in exposes administrative actions without accountability. `rbac-auth-workspace` solves this by combining standard Email/Password login (`HttpOnly` HS256 JWT cookies) with instant 4-digit Station PIN handoffs (`crypto.scrypt` + 5-strike database lockout), backed by server-enforced RBAC (`OWNER`, `MANAGER`, `STAFF`) and an append-only PostgreSQL audit trail.
 
 To test the entire flow in under 30 seconds: open `/login`, click one of the **Quick demo** pills (`Owner`, `Manager`, `Staff`) to autofill credentials or enter a 4-digit passkey PIN (`1042`, `2084`, `3096`), then use **Switch PIN** in the top bar to rotate between operators in place. When switched to `STAFF` (`3096`), administrative tabs disappear from the UI and direct `fetch`/`curl` requests to restricted endpoints such as `/api/users` return a real `403 Forbidden` response while recording `ACCESS_DENIED_403` in Neon PostgreSQL.
