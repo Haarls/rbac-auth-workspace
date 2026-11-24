@@ -24,7 +24,12 @@ export async function middleware(request: NextRequest) {
         { status: 401 },
       );
     }
-    return NextResponse.redirect(new URL('/login', request.url));
+    const proto = request.headers.get('x-forwarded-proto') ?? request.nextUrl.protocol.replace(':', '');
+    const host = request.headers.get('x-forwarded-host') ?? request.headers.get('host');
+    const loginUrl = host
+      ? new URL('/login', `${proto}://${host}`)
+      : new URL('/login', request.url);
+    return NextResponse.redirect(loginUrl);
   }
 
   return NextResponse.next();
