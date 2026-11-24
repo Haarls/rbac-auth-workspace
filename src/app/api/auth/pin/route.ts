@@ -1,4 +1,3 @@
-import { cookies } from 'next/headers';
 import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { getActiveSession, issueSessionCookie } from '@/lib/auth';
@@ -18,61 +17,47 @@ export async function POST(request: NextRequest) {
   }
 
   const user = await prisma.user.findUnique({ where: { email: parsed.data.email } });
-  if (!user || !user.pinHash) {
+  if (!user?.pinHash) {
     return NextResponse.json({ error: 'No PIN configured for this operator.' }, { status: 401 });
   }
 
   const now = new Date();
-  const currentlyLocked = user.pinLockedUntil !== null && user.pinLockedUntil.getTime() > now.getTime();
-  const pinMatched = currentlyLocked ? false : await verifySecret(parsed.data.pin, user.pinHash);
-
+  const isLocked = user.pinLockedUntil !== null && user.pinLockedUntil.getTime() > now.getTime();
+  const matched = isLocked ? false : await verifySecret(parsed.data.pin, user.pinHash);
   const outcome = evaluatePinAttempt(
     { failedCount: user.pinFailedCount, lockedUntil: user.pinLockedUntil },
-    pinMatched,
+    matched,
     now,
   );
 
   await prisma.user.update({
     where: { id: user.id },
-    data: {
-      pinFailedCount: outcome.nextFailedCount,
-      pinLockedUntil: outcome.nextLockedUntil,
-    },
+    data: { pinFailedCount: outcome.nextFailedCount, pinLockedUntil: outcome.nextLockedUntil },
   });
 
-  if (outcome.status === 'LOCKED') {
+  if (outcome.status !== 'OK') {
+    const locked = outcome.status === 'LOCKED';
     await writeAuditLog({
       actorId: user.id,
       actorEmail: user.email,
-      action: 'AUTH_PIN_LOCKED',
+      action: locked ? 'AUTH_PIN_LOCKED' : 'AUTH_PIN_FAILED',
       target: `user:${user.email}`,
-      detail: outcome.message ?? 'PIN locked due to repeated failures',
-    });
-    return NextResponse.json({ error: outcome.message }, { status: 429 });
-  }
-
-  if (outcome.status === 'INVALID') {
-    await writeAuditLog({
-      actorId: user.id,
-      actorEmail: user.email,
-      action: 'AUTH_PIN_FAILED',
-      target: `user:${user.email}`,
-      detail: `${outcome.remainingAttempts} attempts remaining`,
+      detail: locked
+        ? (outcome.message ?? 'PIN locked due to repeated failures')
+        : `${outcome.remainingAttempts} attempts remaining`,
     });
     return NextResponse.json(
       { error: outcome.message, remainingAttempts: outcome.remainingAttempts },
-      { status: 401 },
+      { status: locked ? 429 : 401 },
     );
   }
 
   const prior = await getActiveSession();
-  if (prior && prior.sessionId) {
+  if (prior?.sessionId) {
     await prisma.session.updateMany({
       where: { id: prior.sessionId, revokedAt: null },
       data: { revokedAt: now },
     });
-  } else {
-    await cookies();
   }
 
   const sessionId = await issueSessionCookie({

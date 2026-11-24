@@ -26,13 +26,7 @@ export interface AuditEntryRow {
 }
 
 interface WorkspaceShellProps {
-  currentUser: {
-    id: string;
-    name: string;
-    email: string;
-    role: RoleName;
-    authMethod: string;
-  };
+  currentUser: { id: string; name: string; email: string; role: RoleName; authMethod: string };
   pinOperators: OperatorOption[];
   shifts: ShiftEntryRow[];
   members: TeamMemberRow[];
@@ -41,6 +35,10 @@ interface WorkspaceShellProps {
 }
 
 type TabKey = 'SHIFTS' | 'TEAM' | 'AUDIT';
+
+const ALERT_ACTIONS = new Set(['ACCESS_DENIED_403', 'AUTH_PIN_LOCKED', 'SESSION_REVOKED']);
+const WARN_ACTIONS = new Set(['AUTH_PIN_FAILED', 'AUTH_LOGIN_FAILED']);
+const fmtUtc = (iso: string) => iso.slice(0, 19).replace('T', ' ');
 
 export function WorkspaceShell({
   currentUser,
@@ -59,13 +57,11 @@ export function WorkspaceShell({
 
   const [tab, setTab] = useState<TabKey>('SHIFTS');
   const [pinModalOpen, setPinModalOpen] = useState(false);
-
   const [station, setStation] = useState('REG-01');
   const [summary, setSummary] = useState('');
   const [cashDeltaUsd, setCashDeltaUsd] = useState('0.00');
   const [shiftError, setShiftError] = useState<string | null>(null);
   const [shiftBusy, setShiftBusy] = useState(false);
-
   const [auditActionFilter, setAuditActionFilter] = useState('ALL');
   const [auditQuery, setAuditQuery] = useState('');
 
@@ -78,8 +74,8 @@ export function WorkspaceShell({
     const q = auditQuery.trim().toLowerCase();
     return audits.filter((a) => {
       if (auditActionFilter !== 'ALL' && a.action !== auditActionFilter) return false;
-      if (!q) return true;
       return (
+        !q ||
         a.actorEmail.toLowerCase().includes(q) ||
         a.target.toLowerCase().includes(q) ||
         a.detail.toLowerCase().includes(q) ||
@@ -88,11 +84,15 @@ export function WorkspaceShell({
     });
   }, [audits, auditActionFilter, auditQuery]);
 
-  async function handleLogout() {
-    await fetch('/api/auth/logout', { method: 'POST' });
-    router.push('/login');
-    router.refresh();
-  }
+  const navTabs: Array<{ id: TabKey; label: string }> = [
+    { id: 'SHIFTS', label: 'Shift Operations' },
+    ...(canReadTeam
+      ? [{ id: 'TEAM' as const, label: canManageTeam ? 'Team & Sessions' : 'Team Directory' }]
+      : []),
+    ...(canReadAudit ? [{ id: 'AUDIT' as const, label: `Audit Log (${audits.length})` }] : []),
+  ];
+
+  const activeTab: TabKey = navTabs.some((t) => t.id === tab) ? tab : 'SHIFTS';
 
   async function handleCreateShift(e: React.FormEvent) {
     e.preventDefault();
@@ -102,7 +102,6 @@ export function WorkspaceShell({
       setShiftError('Enter a valid numeric USD amount.');
       return;
     }
-
     setShiftBusy(true);
     try {
       const res = await fetch('/api/shifts', {
@@ -122,14 +121,6 @@ export function WorkspaceShell({
       setShiftBusy(false);
     }
   }
-
-  async function handleVerifyShift(id: string) {
-    const res = await fetch(`/api/shifts/${id}/verify`, { method: 'POST' });
-    if (res.ok) router.refresh();
-  }
-
-  const activeTab: TabKey =
-    (tab === 'TEAM' && !canReadTeam) || (tab === 'AUDIT' && !canReadAudit) ? 'SHIFTS' : tab;
 
   return (
     <div className="min-h-screen bg-canvas">
@@ -159,7 +150,11 @@ export function WorkspaceShell({
             )}
             <button
               type="button"
-              onClick={handleLogout}
+              onClick={async () => {
+                await fetch('/api/auth/logout', { method: 'POST' });
+                router.push('/login');
+                router.refresh();
+              }}
               className="rounded border border-line px-3 py-1.5 text-xs text-muted hover:text-ink"
             >
               Sign Out
@@ -167,47 +162,21 @@ export function WorkspaceShell({
           </div>
         </div>
 
-        <nav
-          aria-label="Workspace sections"
-          className="mx-auto flex max-w-6xl gap-6 px-4 text-xs font-medium"
-        >
-          <button
-            type="button"
-            onClick={() => setTab('SHIFTS')}
-            className={`border-b-2 py-2.5 transition-colors ${
-              activeTab === 'SHIFTS'
-                ? 'border-accent text-ink'
-                : 'border-transparent text-muted hover:text-ink'
-            }`}
-          >
-            Shift Operations
-          </button>
-          {canReadTeam && (
+        <nav aria-label="Workspace sections" className="mx-auto flex max-w-6xl gap-6 px-4 text-xs font-medium">
+          {navTabs.map((item) => (
             <button
+              key={item.id}
               type="button"
-              onClick={() => setTab('TEAM')}
-              className={`border-b-2 py-2.5 transition-colors ${
-                activeTab === 'TEAM'
-                  ? 'border-accent text-ink'
-                  : 'border-transparent text-muted hover:text-ink'
-              }`}
-            >
-              {canManageTeam ? 'Team & Sessions' : 'Team Directory'}
-            </button>
-          )}
-          {canReadAudit && (
-            <button
-              type="button"
-              onClick={() => setTab('AUDIT')}
+              onClick={() => setTab(item.id)}
               className={`tabular-nums border-b-2 py-2.5 transition-colors ${
-                activeTab === 'AUDIT'
+                activeTab === item.id
                   ? 'border-accent text-ink'
                   : 'border-transparent text-muted hover:text-ink'
               }`}
             >
-              Audit Log ({audits.length})
+              {item.label}
             </button>
-          )}
+          ))}
         </nav>
       </header>
 
@@ -220,9 +189,7 @@ export function WorkspaceShell({
               </h2>
               <form onSubmit={handleCreateShift} className="mt-3 grid gap-3 sm:grid-cols-12">
                 <div className="sm:col-span-2">
-                  <label htmlFor="shift-station" className="block text-xs text-muted">
-                    Station
-                  </label>
+                  <label htmlFor="shift-station" className="block text-xs text-muted">Station</label>
                   <input
                     id="shift-station"
                     required
@@ -232,9 +199,7 @@ export function WorkspaceShell({
                   />
                 </div>
                 <div className="sm:col-span-6">
-                  <label htmlFor="shift-summary" className="block text-xs text-muted">
-                    Operational Note
-                  </label>
+                  <label htmlFor="shift-summary" className="block text-xs text-muted">Operational Note</label>
                   <input
                     id="shift-summary"
                     required
@@ -246,9 +211,7 @@ export function WorkspaceShell({
                   />
                 </div>
                 <div className="sm:col-span-2">
-                  <label htmlFor="shift-delta" className="block text-xs text-muted">
-                    Cash Delta (USD)
-                  </label>
+                  <label htmlFor="shift-delta" className="block text-xs text-muted">Cash Delta (USD)</label>
                   <input
                     id="shift-delta"
                     inputMode="decimal"
@@ -268,11 +231,7 @@ export function WorkspaceShell({
                   </button>
                 </div>
               </form>
-              {shiftError && (
-                <p role="alert" className="mt-2 text-xs text-danger">
-                  {shiftError}
-                </p>
-              )}
+              {shiftError && <p role="alert" className="mt-2 text-xs text-danger">{shiftError}</p>}
             </section>
 
             <section className="overflow-x-auto rounded border border-line bg-surface">
@@ -300,17 +259,11 @@ export function WorkspaceShell({
                       const usd = s.cashDeltaCents / 100;
                       return (
                         <tr key={s.id}>
-                          <td className="tabular-nums px-4 py-2.5 font-mono text-muted">
-                            {s.createdAt.slice(0, 19).replace('T', ' ')}
-                          </td>
+                          <td className="tabular-nums px-4 py-2.5 font-mono text-muted">{fmtUtc(s.createdAt)}</td>
                           <td className="px-4 py-2.5 font-mono text-ink">{s.station}</td>
                           <td className="px-4 py-2.5 text-ink">{s.summary}</td>
                           <td className="px-4 py-2.5 font-mono text-muted">{s.authorEmail}</td>
-                          <td
-                            className={`tabular-nums px-4 py-2.5 text-right font-mono ${
-                              usd < 0 ? 'text-warn' : 'text-ink'
-                            }`}
-                          >
+                          <td className={`tabular-nums px-4 py-2.5 text-right font-mono ${usd < 0 ? 'text-warn' : 'text-ink'}`}>
                             {usd >= 0 ? `+$${usd.toFixed(2)}` : `-$${Math.abs(usd).toFixed(2)}`}
                           </td>
                           <td className="px-4 py-2.5 text-right">
@@ -319,7 +272,10 @@ export function WorkspaceShell({
                             ) : canVerifyShift ? (
                               <button
                                 type="button"
-                                onClick={() => handleVerifyShift(s.id)}
+                                onClick={async () => {
+                                  const r = await fetch(`/api/shifts/${s.id}/verify`, { method: 'POST' });
+                                  if (r.ok) router.refresh();
+                                }}
                                 className="rounded border border-line px-2.5 py-0.5 font-mono text-xs text-ink hover:border-accent"
                               >
                                 Verify
@@ -354,9 +310,7 @@ export function WorkspaceShell({
                 Security &amp; Operations Audit ({filteredAudits.length})
               </h2>
               <div className="flex flex-wrap items-center gap-2">
-                <label htmlFor="audit-action" className="sr-only">
-                  Filter by action
-                </label>
+                <label htmlFor="audit-action" className="sr-only">Filter by action</label>
                 <select
                   id="audit-action"
                   value={auditActionFilter}
@@ -364,14 +318,10 @@ export function WorkspaceShell({
                   className="rounded border border-line bg-canvas px-2.5 py-1 font-mono text-xs text-ink"
                 >
                   {auditActions.map((act) => (
-                    <option key={act} value={act}>
-                      {act}
-                    </option>
+                    <option key={act} value={act}>{act}</option>
                   ))}
                 </select>
-                <label htmlFor="audit-search" className="sr-only">
-                  Search audit events
-                </label>
+                <label htmlFor="audit-search" className="sr-only">Search audit events</label>
                 <input
                   id="audit-search"
                   type="search"
@@ -384,9 +334,7 @@ export function WorkspaceShell({
             </div>
 
             {filteredAudits.length === 0 ? (
-              <p className="px-4 py-6 text-xs text-muted">
-                No audit events match the active filter.
-              </p>
+              <p className="px-4 py-6 text-xs text-muted">No audit events match the active filter.</p>
             ) : (
               <table className="w-full text-left text-xs">
                 <thead className="border-b border-line text-muted">
@@ -399,31 +347,27 @@ export function WorkspaceShell({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-line">
-                  {filteredAudits.map((a) => {
-                    const isAlert =
-                      a.action === 'ACCESS_DENIED_403' ||
-                      a.action === 'AUTH_PIN_LOCKED' ||
-                      a.action === 'SESSION_REVOKED';
-                    const isWarn =
-                      a.action === 'AUTH_PIN_FAILED' || a.action === 'AUTH_LOGIN_FAILED';
-                    return (
-                      <tr key={a.id}>
-                        <td className="tabular-nums whitespace-nowrap px-4 py-2.5 font-mono text-muted">
-                          {a.createdAt.slice(0, 19).replace('T', ' ')}
-                        </td>
-                        <td
-                          className={`whitespace-nowrap px-4 py-2.5 font-mono font-medium ${
-                            isAlert ? 'text-danger' : isWarn ? 'text-warn' : 'text-ink'
-                          }`}
-                        >
-                          {a.action}
-                        </td>
-                        <td className="px-4 py-2.5 font-mono text-muted">{a.actorEmail}</td>
-                        <td className="tabular-nums px-4 py-2.5 font-mono text-ink">{a.target}</td>
-                        <td className="px-4 py-2.5 text-muted">{a.detail}</td>
-                      </tr>
-                    );
-                  })}
+                  {filteredAudits.map((a) => (
+                    <tr key={a.id}>
+                      <td className="tabular-nums whitespace-nowrap px-4 py-2.5 font-mono text-muted">
+                        {fmtUtc(a.createdAt)}
+                      </td>
+                      <td
+                        className={`whitespace-nowrap px-4 py-2.5 font-mono font-medium ${
+                          ALERT_ACTIONS.has(a.action)
+                            ? 'text-danger'
+                            : WARN_ACTIONS.has(a.action)
+                              ? 'text-warn'
+                              : 'text-ink'
+                        }`}
+                      >
+                        {a.action}
+                      </td>
+                      <td className="px-4 py-2.5 font-mono text-muted">{a.actorEmail}</td>
+                      <td className="tabular-nums px-4 py-2.5 font-mono text-ink">{a.target}</td>
+                      <td className="px-4 py-2.5 text-muted">{a.detail}</td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             )}

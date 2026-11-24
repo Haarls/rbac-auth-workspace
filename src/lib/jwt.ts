@@ -1,4 +1,5 @@
-import { SignJWT, jwtVerify } from 'jose';
+import { SignJWT } from 'jose/jwt/sign';
+import { jwtVerify } from 'jose/jwt/verify';
 import type { RoleName } from './permissions';
 
 export const SESSION_COOKIE = 'rbac_session';
@@ -33,21 +34,16 @@ export async function signSessionJwt(claims: SessionTokenClaims): Promise<string
 
 export async function verifySessionJwt(token: string): Promise<SessionTokenClaims | null> {
   try {
-    const { payload } = await jwtVerify(token, getSigningKey(), { algorithms: ['HS256'] });
+    const { payload: p } = await jwtVerify(token, getSigningKey(), { algorithms: ['HS256'] });
     if (
-      typeof payload.sid !== 'string' ||
-      typeof payload.sub !== 'string' ||
-      typeof payload.email !== 'string' ||
-      (payload.role !== 'OWNER' && payload.role !== 'MANAGER' && payload.role !== 'STAFF')
+      typeof p.sid !== 'string' ||
+      typeof p.sub !== 'string' ||
+      typeof p.email !== 'string' ||
+      (p.role !== 'OWNER' && p.role !== 'MANAGER' && p.role !== 'STAFF')
     ) {
       return null;
     }
-    return {
-      sid: payload.sid,
-      sub: payload.sub,
-      email: payload.email,
-      role: payload.role,
-    };
+    return { sid: p.sid, sub: p.sub, email: p.email, role: p.role };
   } catch {
     return null;
   }
