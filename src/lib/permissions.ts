@@ -32,3 +32,9 @@ export function requiredRoleLabel(permission: Permission): RoleName {
   if (ROLE_PERMISSIONS.MANAGER.includes(permission)) return 'MANAGER';
   return 'OWNER';
 }
+
+export const ROLE_BADGE: Record<RoleName, string> = {
+  OWNER: 'border-accent/30 bg-accent/10 text-accent',
+  MANAGER: 'border-line bg-line/80 text-ink',
+  STAFF: 'border-line bg-canvas text-muted',
+};
