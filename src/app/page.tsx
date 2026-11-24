@@ -8,10 +8,9 @@ export const dynamic = 'force-dynamic';
 
 export default async function WorkspacePage() {
   const ctx = await getActiveSession();
-  if (!ctx) {
-    redirect('/login');
-  }
+  if (!ctx) redirect('/login');
 
+  const now = new Date();
   const canReadTeam = hasPermission(ctx.user.role, 'team:read');
   const canRevoke = hasPermission(ctx.user.role, 'session:revoke');
   const canReadAudit = hasPermission(ctx.user.role, 'audit:read');
@@ -43,17 +42,14 @@ export default async function WorkspacePage() {
       : Promise.resolve([]),
     canRevoke
       ? prisma.session.findMany({
-          where: { revokedAt: null, expiresAt: { gt: new Date() } },
+          where: { revokedAt: null, expiresAt: { gt: now } },
           orderBy: { createdAt: 'desc' },
           take: 30,
           include: { user: { select: { email: true, role: true } } },
         })
       : Promise.resolve([]),
     canReadAudit
-      ? prisma.auditLog.findMany({
-          orderBy: { createdAt: 'desc' },
-          take: 80,
-        })
+      ? prisma.auditLog.findMany({ orderBy: { createdAt: 'desc' }, take: 80 })
       : Promise.resolve([]),
   ]);
 
@@ -82,7 +78,7 @@ export default async function WorkspacePage() {
         email: u.email,
         role: u.role,
         hasPin: Boolean(u.pinHash),
-        pinLockedUntil: u.pinLockedUntil?.toISOString() ?? null,
+        pinLocked: Boolean(u.pinLockedUntil && u.pinLockedUntil > now),
         createdAt: u.createdAt.toISOString(),
       }))}
       sessions={sessionRows.map((s) => ({

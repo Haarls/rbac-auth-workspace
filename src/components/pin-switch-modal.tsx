@@ -2,9 +2,9 @@
 
 import { AlertCircle, ArrowRight, Loader2, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ROLE_DOT, type RoleName } from '@/lib/permissions';
-import { BTN_GHOST, BTN_PRIMARY, type RequestState } from '@/lib/ui';
+import { apiJson, BTN_GHOST, BTN_PRIMARY, type RequestState } from '@/lib/ui';
 import { CustomSelect } from './custom-select';
 import { PinOtpInput } from './pin-otp-input';
 
@@ -15,16 +15,16 @@ export interface OperatorOption {
 }
 
 interface PinSwitchModalProps {
-  open: boolean;
   onClose: () => void;
   operators: OperatorOption[];
   currentEmail: string;
 }
 
-export function PinSwitchModal({ open, onClose, operators, currentEmail }: PinSwitchModalProps) {
+export function PinSwitchModal({ onClose, operators, currentEmail }: PinSwitchModalProps) {
   const router = useRouter();
+  const dialogRef = useRef<HTMLDialogElement>(null);
   const [selectedEmail, setSelectedEmail] = useState(
-    operators.find((o) => o.email !== currentEmail)?.email ?? operators[0]?.email ?? '',
+    () => operators.find((o) => o.email !== currentEmail)?.email ?? operators[0]?.email ?? '',
   );
   const [pin, setPin] = useState('');
   const [req, setReq] = useState<RequestState>({ status: 'idle' });
@@ -40,66 +40,42 @@ export function PinSwitchModal({ open, onClose, operators, currentEmail }: PinSw
   );
 
   useEffect(() => {
-    if (!open) return;
-    setPin('');
-    setReq({ status: 'idle' });
-    setSelectedEmail(
-      operators.find((o) => o.email !== currentEmail)?.email ?? operators[0]?.email ?? '',
-    );
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open, currentEmail, operators, onClose]);
+    const dialog = dialogRef.current;
+    if (dialog && !dialog.open) dialog.showModal();
+  }, []);
 
-  if (!open) return null;
   const pending = req.status === 'loading';
 
   async function submitPinSwitch(code: string) {
     if (pending || code.length < 4) return;
     setReq({ status: 'loading' });
-    try {
-      const res = await fetch('/api/auth/pin', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: selectedEmail, pin: code }),
-      });
-      const data = (await res.json()) as { error?: string };
-      if (!res.ok) {
-        setPin('');
-        return setReq({
-          status: 'error',
-          message: data.error ?? `PIN switch failed (HTTP ${res.status}).`,
-        });
-      }
-      onClose();
-      router.refresh();
-    } catch {
-      setReq({ status: 'error', message: 'Network error while switching operator.' });
+    const res = await apiJson('/api/auth/pin', 'POST', { email: selectedEmail, pin: code });
+    if (!res.ok) {
+      setPin('');
+      setReq({ status: 'error', message: res.error });
+      return;
     }
+    onClose();
+    router.refresh();
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-[2px]"
-      onMouseDown={(e) => e.target === e.currentTarget && onClose()}
+    <dialog
+      ref={dialogRef}
+      aria-labelledby="pin-switch-title"
+      onClose={onClose}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      className="m-auto w-full max-w-[360px] rounded-2xl border border-white/[0.08] bg-[#111113] p-0 text-zinc-100 shadow-elevated"
     >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="pin-switch-title"
-        className="w-full max-w-[360px] rounded-2xl border border-white/[0.08] bg-[#111113] p-5 shadow-elevated sm:p-6"
-      >
+      <div className="p-5 sm:p-6">
         <div className="flex items-start justify-between">
           <div>
-            <h2
-              id="pin-switch-title"
-              className="text-base font-medium tracking-[-0.02em] text-zinc-100"
-            >
+            <h1 id="pin-switch-title" className="text-base font-medium tracking-[-0.02em] text-zinc-100">
               Switch operator
-            </h2>
-            <p className="mt-0.5 text-xs text-zinc-400">
-              Select an operator and enter their 4-digit PIN
-            </p>
+            </h1>
+            <p className="mt-0.5 text-xs text-zinc-400">Select an operator and enter their 4-digit PIN</p>
           </div>
           <button
             type="button"
@@ -147,9 +123,7 @@ export function PinSwitchModal({ open, onClose, operators, currentEmail }: PinSw
               value={pin}
               onChange={(next) => {
                 setPin(next);
-                if (req.status === 'error') {
-                  setReq({ status: 'idle' });
-                }
+                if (req.status === 'error') setReq({ status: 'idle' });
               }}
               onComplete={(code) => void submitPinSwitch(code)}
               disabled={pending}
@@ -171,11 +145,7 @@ export function PinSwitchModal({ open, onClose, operators, currentEmail }: PinSw
             <button type="button" onClick={onClose} className={`${BTN_GHOST} h-9 px-3.5`}>
               Cancel
             </button>
-            <button
-              type="submit"
-              disabled={pending || pin.length < 4}
-              className={`${BTN_PRIMARY} h-9 gap-1.5 px-3.5`}
-            >
+            <button type="submit" disabled={pending || pin.length < 4} className={`${BTN_PRIMARY} h-9 gap-1.5 px-3.5`}>
               {pending ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
               ) : (
@@ -188,6 +158,6 @@ export function PinSwitchModal({ open, onClose, operators, currentEmail }: PinSw
           </div>
         </form>
       </div>
-    </div>
+    </dialog>
   );
 }

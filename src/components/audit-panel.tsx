@@ -75,8 +75,7 @@ export function AuditPanel({ audits }: { audits: AuditEntryRow[] }) {
             value={actionFilter}
             options={options}
             onChange={setActionFilter}
-            mono
-            className="w-full sm:w-auto sm:min-w-[195px]"
+            className="h-9 w-full font-mono sm:w-auto sm:min-w-[195px]"
           />
           <div className="relative w-full sm:w-60">
             <Search

@@ -4,7 +4,7 @@ import { Info, KeyRound, LogOut, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { hasPermission, ROLE_DOT, type RoleName } from '@/lib/permissions';
-import { BTN_GHOST } from '@/lib/ui';
+import { apiJson, BTN_GHOST } from '@/lib/ui';
 import { AuditPanel, type AuditEntryRow } from './audit-panel';
 import { BrandIsotipo } from './pin-otp-input';
 import { PinSwitchModal, type OperatorOption } from './pin-switch-modal';
@@ -39,14 +39,7 @@ const OVERVIEW_POINTS = [
   },
 ] as const;
 
-export function WorkspaceShell({
-  currentUser,
-  pinOperators,
-  shifts,
-  members,
-  sessions,
-  audits,
-}: WorkspaceShellProps) {
+export function WorkspaceShell({ currentUser, pinOperators, shifts, members, sessions, audits }: WorkspaceShellProps) {
   const router = useRouter();
   const canReadTeam = hasPermission(currentUser.role, 'team:read');
   const canManageTeam = hasPermission(currentUser.role, 'team:manage');
@@ -60,15 +53,7 @@ export function WorkspaceShell({
 
   const navTabs: Array<{ id: TabKey; label: string; count: number }> = [
     { id: 'SHIFTS', label: 'Shift operations', count: shifts.length },
-    ...(canReadTeam
-      ? [
-          {
-            id: 'TEAM' as const,
-            label: canManageTeam ? 'Team & sessions' : 'Team directory',
-            count: members.length,
-          },
-        ]
-      : []),
+    ...(canReadTeam ? [{ id: 'TEAM' as const, label: canManageTeam ? 'Team & sessions' : 'Team directory', count: members.length }] : []),
     ...(canReadAudit ? [{ id: 'AUDIT' as const, label: 'Audit log', count: audits.length }] : []),
   ];
 
@@ -90,8 +75,7 @@ export function WorkspaceShell({
               <span>{currentUser.role}</span>
             </span>
             <span className="truncate text-xs text-zinc-500">
-              {currentUser.name}{' '}
-              <span className="hidden font-mono sm:inline">· {currentUser.email}</span>
+              {currentUser.name} <span className="hidden font-mono sm:inline">· {currentUser.email}</span>
             </span>
           </div>
 
@@ -100,17 +84,17 @@ export function WorkspaceShell({
               type="button"
               aria-expanded={aboutOpen}
               onClick={() => setAboutOpen((p) => !p)}
-              className={`inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium transition-colors ${aboutOpen ? 'border-white/[0.18] bg-white/[0.07] text-zinc-100' : 'border-white/[0.08] bg-[#111113] text-zinc-400 hover:border-white/[0.16] hover:text-zinc-200'}`}
+              className={`inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium transition-colors ${
+                aboutOpen
+                  ? 'border-white/[0.18] bg-white/[0.07] text-zinc-100'
+                  : 'border-white/[0.08] bg-[#111113] text-zinc-400 hover:border-white/[0.16] hover:text-zinc-200'
+              }`}
             >
               <Info className="h-3.5 w-3.5 text-[#4ECDC4]" aria-hidden="true" />
               <span>About this sandbox</span>
             </button>
             {pinOperators.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setPinModalOpen(true)}
-                className={`${BTN_GHOST} h-8 shadow-card`}
-              >
+              <button type="button" onClick={() => setPinModalOpen(true)} className={`${BTN_GHOST} h-8 shadow-card`}>
                 <KeyRound className="h-3.5 w-3.5 text-zinc-500" aria-hidden="true" />
                 <span>Switch PIN</span>
               </button>
@@ -118,7 +102,7 @@ export function WorkspaceShell({
             <button
               type="button"
               onClick={async () => {
-                await fetch('/api/auth/logout', { method: 'POST' });
+                await apiJson('/api/auth/logout', 'POST');
                 router.push('/login');
                 router.refresh();
               }}
@@ -162,7 +146,9 @@ export function WorkspaceShell({
               key={item.id}
               type="button"
               onClick={() => setTab(item.id)}
-              className={`inline-flex shrink-0 items-center gap-2 border-b-2 pb-2.5 pt-1 font-medium transition-colors ${activeTab === item.id ? 'border-zinc-100 text-zinc-100' : 'border-transparent text-zinc-500 hover:text-zinc-300'}`}
+              className={`inline-flex shrink-0 items-center gap-2 border-b-2 pb-2.5 pt-1 font-medium transition-colors ${
+                activeTab === item.id ? 'border-zinc-100 text-zinc-100' : 'border-transparent text-zinc-500 hover:text-zinc-300'
+              }`}
             >
               <span>{item.label}</span>
               <span className="tabular-nums rounded bg-white/[0.05] px-1.5 py-0.5 font-mono text-[10px] text-zinc-400">
@@ -176,22 +162,14 @@ export function WorkspaceShell({
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
         {activeTab === 'SHIFTS' && <ShiftPanel shifts={shifts} canVerify={canVerifyShift} />}
         {activeTab === 'TEAM' && canReadTeam && (
-          <TeamPanel
-            canManage={canManageTeam}
-            canRevokeSessions={canRevoke}
-            members={members}
-            sessions={sessions}
-          />
+          <TeamPanel canManage={canManageTeam} canRevokeSessions={canRevoke} members={members} sessions={sessions} />
         )}
         {activeTab === 'AUDIT' && canReadAudit && <AuditPanel audits={audits} />}
       </main>
 
-      <PinSwitchModal
-        open={pinModalOpen}
-        onClose={() => setPinModalOpen(false)}
-        operators={pinOperators}
-        currentEmail={currentUser.email}
-      />
+      {pinModalOpen && (
+        <PinSwitchModal onClose={() => setPinModalOpen(false)} operators={pinOperators} currentEmail={currentUser.email} />
+      )}
     </div>
   );
 }

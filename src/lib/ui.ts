@@ -15,3 +15,21 @@ export const TH_CLS = 'whitespace-nowrap px-5 py-3 font-medium sm:px-6';
 export const TD_CLS = 'whitespace-nowrap px-5 py-3.5 sm:px-6';
 
 export const fmtUtc = (iso: string, len = 19) => iso.slice(0, len).replace('T', ' ');
+
+export async function apiJson(
+  url: string,
+  method: 'POST' | 'PATCH',
+  body?: unknown,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const res = await fetch(url, {
+      method,
+      headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    });
+    const data = (await res.json().catch(() => ({}))) as { error?: string };
+    return res.ok ? { ok: true } : { ok: false, error: data.error ?? `Request failed (HTTP ${res.status}).` };
+  } catch {
+    return { ok: false, error: 'Network error while contacting server.' };
+  }
+}
