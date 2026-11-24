@@ -1,0 +1,80 @@
+import { NextResponse, type NextRequest } from 'next/server';
+import { z } from 'zod';
+import { requireApiPermission } from '@/lib/auth';
+import { hashSecret } from '@/lib/crypto';
+import { prisma, writeAuditLog } from '@/lib/db';
+
+const UpdateUserSchema = z
+  .object({
+    role: z.enum(['OWNER', 'MANAGER', 'STAFF']).optional(),
+    pin: z.string().regex(/^\d{4,6}$/, 'PIN must be 4 to 6 digits.').optional(),
+  })
+  .refine((d) => d.role !== undefined || d.pin !== undefined, {
+    message: 'Provide role or pin to update.',
+  });
+
+export async function PATCH(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> },
+) {
+  const { id } = await context.params;
+  const guard = await requireApiPermission('team:manage', `PATCH /api/users/${id}`);
+  if (!guard.ok) return guard.response;
+
+  const body = await request.json().catch(() => null);
+  const parsed = UpdateUserSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: 'Invalid role or PIN (must be 4-6 digits).' }, { status: 400 });
+  }
+
+  const target = await prisma.user.findUnique({ where: { id } });
+  if (!target) {
+    return NextResponse.json({ error: 'User not found.' }, { status: 404 });
+  }
+
+  if (parsed.data.role && target.role === 'OWNER' && parsed.data.role !== 'OWNER') {
+    const ownerCount = await prisma.user.count({ where: { role: 'OWNER' } });
+    if (ownerCount <= 1) {
+      return NextResponse.json(
+        { error: 'Cannot demote the last OWNER in the workspace.' },
+        { status: 400 },
+      );
+    }
+  }
+
+  const pinHash = parsed.data.pin ? await hashSecret(parsed.data.pin) : undefined;
+
+  const updated = await prisma.user.update({
+    where: { id },
+    data: {
+      ...(parsed.data.role ? { role: parsed.data.role } : {}),
+      ...(pinHash !== undefined
+        ? { pinHash, pinFailedCount: 0, pinLockedUntil: null }
+        : {}),
+    },
+  });
+
+  if (parsed.data.role && parsed.data.role !== target.role) {
+    await writeAuditLog({
+      actorId: guard.ctx.user.id,
+      actorEmail: guard.ctx.user.email,
+      action: 'ROLE_CHANGED',
+      target: target.email,
+      detail: `${target.role} -> ${updated.role}`,
+    });
+  }
+
+  if (pinHash !== undefined) {
+    await writeAuditLog({
+      actorId: guard.ctx.user.id,
+      actorEmail: guard.ctx.user.email,
+      action: 'PIN_UPDATED',
+      target: target.email,
+      detail: 'Operator PIN rotated and lockout counter cleared',
+    });
+  }
+
+  return NextResponse.json({
+    user: { id: updated.id, email: updated.email, role: updated.role },
+  });
+}

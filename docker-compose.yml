@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: rbac-workspace-pg
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: rbac_workspace
+    ports:
+      - "5433:5432"
+    volumes:
+      - rbac_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d rbac_workspace"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  rbac_pgdata:
