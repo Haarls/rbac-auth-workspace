@@ -7,28 +7,19 @@ import { hasPermission, requiredRoleLabel, type Permission, type RoleName } from
 export interface AuthenticatedContext {
   sessionId: string;
   method: string;
-  user: {
-    id: string;
-    email: string;
-    name: string;
-    role: RoleName;
-  };
+  user: { id: string; email: string; name: string; role: RoleName };
 }
 
 export async function getActiveSession(): Promise<AuthenticatedContext | null> {
-  const cookieStore = await cookies();
-  const token = cookieStore.get(SESSION_COOKIE)?.value;
-  if (!token) return null;
-
-  const claims = await verifySessionJwt(token);
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  const claims = token ? await verifySessionJwt(token) : null;
   if (!claims) return null;
 
-  // Always resolve role and revocation state from PostgreSQL so demotions or session revocations apply immediately.
+  // Resolve session revocation and live role from PostgreSQL on every request.
   const session = await prisma.session.findUnique({
     where: { id: claims.sid },
     include: { user: true },
   });
-
   if (!session || session.revokedAt !== null || session.expiresAt.getTime() <= Date.now()) {
     return null;
   }
@@ -52,13 +43,12 @@ export async function issueSessionCookie(params: {
   method: 'PASSWORD' | 'PIN';
   userAgent?: string | null;
 }): Promise<string> {
-  const expiresAt = new Date(Date.now() + SESSION_TTL_SECONDS * 1000);
   const session = await prisma.session.create({
     data: {
       userId: params.userId,
       method: params.method,
       userAgent: params.userAgent ? params.userAgent.slice(0, 180) : null,
-      expiresAt,
+      expiresAt: new Date(Date.now() + SESSION_TTL_SECONDS * 1000),
     },
   });
 
@@ -69,8 +59,7 @@ export async function issueSessionCookie(params: {
     role: params.role,
   });
 
-  const cookieStore = await cookies();
-  cookieStore.set(SESSION_COOKIE, jwt, {
+  (await cookies()).set(SESSION_COOKIE, jwt, {
     httpOnly: true,
     sameSite: 'lax',
     secure: process.env.NODE_ENV === 'production',
@@ -102,13 +91,9 @@ export async function requireApiPermission(
       target: targetResource,
       detail: `Role ${ctx.user.role} lacks '${permission}' (${needed} required)`,
     });
-
     return {
       ok: false,
-      response: NextResponse.json(
-        { error: `403 Forbidden: ${needed} role required.` },
-        { status: 403 },
-      ),
+      response: NextResponse.json({ error: `403 Forbidden: ${needed} role required.` }, { status: 403 }),
     };
   }
 
