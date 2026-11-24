@@ -6,10 +6,16 @@ import { prisma, writeAuditLog } from '@/lib/db';
 
 const CreateUserSchema = z.object({
   name: z.string().trim().min(2).max(80),
-  email: z.string().email().transform((v) => v.toLowerCase().trim()),
+  email: z
+    .string()
+    .email()
+    .transform((v) => v.toLowerCase().trim()),
   password: z.string().min(8).max(128),
   role: z.enum(['OWNER', 'MANAGER', 'STAFF']),
-  pin: z.string().regex(/^\d{4,6}$/).optional(),
+  pin: z
+    .string()
+    .regex(/^\d{4,6}$/)
+    .optional(),
 });
 
 export async function GET() {

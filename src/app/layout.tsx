@@ -3,7 +3,8 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: 'Haarls / Workspace — Hybrid Auth & RBAC',
-  description: 'Operational workspace with hybrid Email/Password + Station PIN authentication and strict RBAC.',
+  description:
+    'Operational workspace with hybrid Email/Password + Station PIN authentication and strict RBAC.',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -39,7 +39,9 @@ export function SessionsTable({
             Revoking a session invalidates its HttpOnly token on the next request.
           </p>
         </div>
-        <span className="tabular-nums font-mono text-xs text-zinc-500">{sessions.length} active</span>
+        <span className="tabular-nums font-mono text-xs text-zinc-500">
+          {sessions.length} active
+        </span>
       </div>
 
       {sessions.length === 0 ? (
@@ -50,7 +52,9 @@ export function SessionsTable({
             <thead className="border-b border-white/[0.08] text-[11px] font-medium text-zinc-500">
               <tr>
                 {SESSION_HEADERS.map((h) => (
-                  <th key={h.label} className={`${TH_CLS} ${h.align}`}>{h.label}</th>
+                  <th key={h.label} className={`${TH_CLS} ${h.align}`}>
+                    {h.label}
+                  </th>
                 ))}
               </tr>
             </thead>
@@ -71,7 +75,9 @@ export function SessionsTable({
                     <span className="ml-2 font-mono text-[11px] text-zinc-500">{s.userRole}</span>
                   </td>
                   <td className={`${TD_CLS} font-mono text-zinc-500`}>{s.method}</td>
-                  <td className={`${TD_CLS} tabular-nums font-mono text-zinc-500`}>{fmtUtc(s.createdAt)}</td>
+                  <td className={`${TD_CLS} tabular-nums font-mono text-zinc-500`}>
+                    {fmtUtc(s.createdAt)}
+                  </td>
                   <td className={`${TD_CLS} text-right`}>
                     <button
                       type="button"

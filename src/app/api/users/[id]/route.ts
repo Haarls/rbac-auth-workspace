@@ -7,16 +7,16 @@ import { prisma, writeAuditLog } from '@/lib/db';
 const UpdateUserSchema = z
   .object({
     role: z.enum(['OWNER', 'MANAGER', 'STAFF']).optional(),
-    pin: z.string().regex(/^\d{4,6}$/, 'PIN must be 4 to 6 digits.').optional(),
+    pin: z
+      .string()
+      .regex(/^\d{4,6}$/, 'PIN must be 4 to 6 digits.')
+      .optional(),
   })
   .refine((d) => d.role !== undefined || d.pin !== undefined, {
     message: 'Provide role or pin to update.',
   });
 
-export async function PATCH(
-  request: NextRequest,
-  context: { params: Promise<{ id: string }> },
-) {
+export async function PATCH(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
   const guard = await requireApiPermission('team:manage', `PATCH /api/users/${id}`);
   if (!guard.ok) return guard.response;
@@ -24,7 +24,10 @@ export async function PATCH(
   const body = await request.json().catch(() => null);
   const parsed = UpdateUserSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Invalid role or PIN (must be 4-6 digits).' }, { status: 400 });
+    return NextResponse.json(
+      { error: 'Invalid role or PIN (must be 4-6 digits).' },
+      { status: 400 },
+    );
   }
 
   const target = await prisma.user.findUnique({ where: { id } });
@@ -48,9 +51,7 @@ export async function PATCH(
     where: { id },
     data: {
       ...(parsed.data.role ? { role: parsed.data.role } : {}),
-      ...(pinHash !== undefined
-        ? { pinHash, pinFailedCount: 0, pinLockedUntil: null }
-        : {}),
+      ...(pinHash !== undefined ? { pinHash, pinFailedCount: 0, pinLockedUntil: null } : {}),
     },
   });
 

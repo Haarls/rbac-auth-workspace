@@ -5,7 +5,10 @@ import { verifySecret } from '@/lib/crypto';
 import { prisma, writeAuditLog } from '@/lib/db';
 
 const LoginSchema = z.object({
-  email: z.string().email().transform((v) => v.toLowerCase().trim()),
+  email: z
+    .string()
+    .email()
+    .transform((v) => v.toLowerCase().trim()),
   password: z.string().min(1).max(128),
 });
 

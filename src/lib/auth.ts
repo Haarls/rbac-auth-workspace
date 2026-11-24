@@ -78,7 +78,10 @@ export async function requireApiPermission(
   if (!ctx) {
     return {
       ok: false,
-      response: NextResponse.json({ error: '401 Unauthorized: Active session required.' }, { status: 401 }),
+      response: NextResponse.json(
+        { error: '401 Unauthorized: Active session required.' },
+        { status: 401 },
+      ),
     };
   }
 
@@ -93,7 +96,10 @@ export async function requireApiPermission(
     });
     return {
       ok: false,
-      response: NextResponse.json({ error: `403 Forbidden: ${needed} role required.` }, { status: 403 }),
+      response: NextResponse.json(
+        { error: `403 Forbidden: ${needed} role required.` },
+        { status: 403 },
+      ),
     };
   }
 

@@ -5,7 +5,10 @@ import { evaluatePinAttempt, verifySecret } from '@/lib/crypto';
 import { prisma, writeAuditLog } from '@/lib/db';
 
 const PinUnlockSchema = z.object({
-  email: z.string().email().transform((v) => v.toLowerCase().trim()),
+  email: z
+    .string()
+    .email()
+    .transform((v) => v.toLowerCase().trim()),
   pin: z.string().regex(/^\d{4,6}$/, 'PIN must be 4 to 6 digits.'),
 });
 
@@ -13,7 +16,10 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
   const parsed = PinUnlockSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Select an operator and enter a 4-6 digit PIN.' }, { status: 400 });
+    return NextResponse.json(
+      { error: 'Select an operator and enter a 4-6 digit PIN.' },
+      { status: 400 },
+    );
   }
 
   const user = await prisma.user.findUnique({ where: { email: parsed.data.email } });
