@@ -1,7 +1,8 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { requireApiPermission } from '../../../lib/auth';
-import { prisma, writeAuditLog } from '../../../lib/db';
+import { prisma, pruneSandboxShifts, writeAuditLog } from '../../../lib/db';
+import { checkWriteRateLimit, extractClientIp, parseJsonBody } from '../../../lib/security';
 
 const CreateShiftSchema = z.object({
   station: z.string().trim().min(2).max(24),
@@ -10,21 +11,28 @@ const CreateShiftSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  const limited = checkWriteRateLimit(extractClientIp(request.headers));
+  if (limited) return limited;
+
   const guard = await requireApiPermission('shift:create', 'POST /api/shifts');
   if (!guard.ok) return guard.response;
 
-  const body = await request.json().catch(() => null);
-  const parsed = CreateShiftSchema.safeParse(body);
+  const raw = await parseJsonBody(request);
+  if (!raw.ok) return raw.response;
+
+  const parsed = CreateShiftSchema.safeParse(raw.data);
   if (!parsed.success) {
     return NextResponse.json(
-      { error: 'Station, summary (4+ chars), and valid cash amount required.' },
+      { error: 'Station, summary (4-200 chars), and valid cash amount required.' },
       { status: 400 },
     );
   }
 
+  const { sandboxId } = guard.ctx;
   const cashDeltaCents = Math.round(parsed.data.cashDeltaUsd * 100);
   const shift = await prisma.shiftLog.create({
     data: {
+      sandboxId,
       station: parsed.data.station.toUpperCase(),
       summary: parsed.data.summary,
       cashDeltaCents,
@@ -32,7 +40,9 @@ export async function POST(request: NextRequest) {
     },
   });
 
+  await pruneSandboxShifts(sandboxId);
   await writeAuditLog({
+    sandboxId,
     actorId: guard.ctx.user.id,
     actorEmail: guard.ctx.user.email,
     action: 'SHIFT_RECORDED',

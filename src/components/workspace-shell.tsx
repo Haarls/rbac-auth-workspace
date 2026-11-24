@@ -14,6 +14,7 @@ import { TeamPanel, type ActiveSessionRow, type TeamMemberRow } from './team-pan
 export type { AuditEntryRow, ShiftEntryRow };
 
 interface WorkspaceShellProps {
+  sandboxId: string;
   currentUser: { id: string; name: string; email: string; role: RoleName; authMethod: string };
   pinOperators: OperatorOption[];
   shifts: ShiftEntryRow[];
@@ -34,12 +35,12 @@ const OVERVIEW_POINTS = [
     body: 'Every Route Handler resolves live User.role and active Session rows from Neon PostgreSQL—demotions and revocations apply on the next request.',
   },
   {
-    title: '3. Test HTTP 403 & Audit Log',
-    body: 'Click Switch PIN → Mateo Silva (STAFF, PIN 3096). Requests to /api/users return 403 Forbidden and append ACCESS_DENIED_403 (switch back with 1042).',
+    title: '3. Private 6h Ephemeral Sandbox',
+    body: 'This workspace is isolated to your browser session and auto-deletes after 6 hours. Click Switch PIN (3096 for STAFF, 1042 for OWNER) to test 403 denials safely.',
   },
 ] as const;
 
-export function WorkspaceShell({ currentUser, pinOperators, shifts, members, sessions, audits }: WorkspaceShellProps) {
+export function WorkspaceShell({ sandboxId, currentUser, pinOperators, shifts, members, sessions, audits }: WorkspaceShellProps) {
   const router = useRouter();
   const canReadTeam = hasPermission(currentUser.role, 'team:read');
   const canManageTeam = hasPermission(currentUser.role, 'team:manage');
@@ -124,6 +125,9 @@ export function WorkspaceShell({ currentUser, pinOperators, shifts, members, ses
                     <p className="mt-1">{pt.body}</p>
                   </div>
                 ))}
+                <p className="md:col-span-3 font-mono text-[11px] text-zinc-500">
+                  Active isolated sandbox: <span className="text-zinc-300">{sandboxId}</span> · Auto-expires in 6h
+                </p>
               </div>
               <button
                 type="button"

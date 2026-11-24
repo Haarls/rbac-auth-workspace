@@ -13,10 +13,10 @@ export const ROLE_OPTIONS: readonly SelectOption<RoleName>[] = [
 ];
 
 const NewOperatorSchema = z.object({
-  name: z.string().trim().min(2),
-  email: z.string().email(),
-  password: z.string().min(8),
-  pin: z.string().regex(/^\d{4}$/).optional().or(z.literal('')),
+  name: z.string().trim().min(2).max(100),
+  email: z.string().trim().max(100).email(),
+  password: z.string().min(8).max(64),
+  pin: z.string().trim().regex(/^\d{4,6}$/).optional().or(z.literal('')),
 });
 
 const FIELDS = [
@@ -74,9 +74,9 @@ export function ProvisionForm({ busy, onValidationError, onSubmitOperator }: Pro
             id="new-pin"
             name="pin"
             inputMode="numeric"
-            pattern="\d{4}"
-            maxLength={4}
-            placeholder="4 digits"
+            pattern="\d{4,6}"
+            maxLength={6}
+            placeholder="4-6 digits"
             className={`${INPUT_CLS} tabular-nums font-mono`}
           />
         </div>

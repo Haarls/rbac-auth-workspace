@@ -1,14 +1,19 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 import { requireApiPermission } from '../../../../../lib/auth';
 import { prisma, writeAuditLog } from '../../../../../lib/db';
+import { checkWriteRateLimit, extractClientIp } from '../../../../../lib/security';
 
-export async function POST(_request: Request, context: { params: Promise<{ id: string }> }) {
+export async function POST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
+  const limited = checkWriteRateLimit(extractClientIp(request.headers));
+  if (limited) return limited;
+
   const { id } = await context.params;
   const guard = await requireApiPermission('session:revoke', `POST /api/sessions/${id}/revoke`);
   if (!guard.ok) return guard.response;
 
-  const session = await prisma.session.findUnique({
-    where: { id },
+  const { sandboxId } = guard.ctx;
+  const session = await prisma.session.findFirst({
+    where: { id, sandboxId },
     include: { user: { select: { email: true } } },
   });
 
@@ -18,11 +23,12 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
 
   if (session.revokedAt === null) {
     await prisma.session.update({
-      where: { id },
+      where: { id: session.id },
       data: { revokedAt: new Date() },
     });
 
     await writeAuditLog({
+      sandboxId,
       actorId: guard.ctx.user.id,
       actorEmail: guard.ctx.user.email,
       action: 'SESSION_REVOKED',

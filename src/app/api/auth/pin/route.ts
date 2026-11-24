@@ -3,18 +3,23 @@ import { z } from 'zod';
 import { getActiveSession, issueSessionCookie } from '../../../../lib/auth';
 import { evaluatePinAttempt, verifySecret } from '../../../../lib/crypto';
 import { prisma, writeAuditLog } from '../../../../lib/db';
+import { ensureSandbox } from '../../../../lib/sandbox';
+import { checkWriteRateLimit, extractClientIp, parseJsonBody } from '../../../../lib/security';
 
 const PinUnlockSchema = z.object({
-  email: z
-    .string()
-    .email()
-    .transform((v) => v.toLowerCase().trim()),
-  pin: z.string().regex(/^\d{4,6}$/, 'PIN must be 4 to 6 digits.'),
+  email: z.string().trim().max(100).email().transform((v) => v.toLowerCase()),
+  pin: z.string().trim().regex(/^\d{4,6}$/, 'PIN must be 4 to 6 digits.'),
 });
 
 export async function POST(request: NextRequest) {
-  const body = await request.json().catch(() => null);
-  const parsed = PinUnlockSchema.safeParse(body);
+  const ip = extractClientIp(request.headers);
+  const limited = checkWriteRateLimit(ip);
+  if (limited) return limited;
+
+  const raw = await parseJsonBody(request);
+  if (!raw.ok) return raw.response;
+
+  const parsed = PinUnlockSchema.safeParse(raw.data);
   if (!parsed.success) {
     return NextResponse.json(
       { error: 'Select an operator and enter a 4-6 digit PIN.' },
@@ -22,7 +27,12 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const user = await prisma.user.findUnique({ where: { email: parsed.data.email } });
+  const sbx = await ensureSandbox(ip);
+  if (!sbx.ok) return NextResponse.json({ error: sbx.error }, { status: sbx.status });
+
+  const user = await prisma.user.findUnique({
+    where: { sandboxId_email: { sandboxId: sbx.sandboxId, email: parsed.data.email } },
+  });
   if (!user?.pinHash) {
     return NextResponse.json({ error: 'No PIN configured for this operator.' }, { status: 401 });
   }
@@ -44,6 +54,7 @@ export async function POST(request: NextRequest) {
   if (outcome.status !== 'OK') {
     const locked = outcome.status === 'LOCKED';
     await writeAuditLog({
+      sandboxId: sbx.sandboxId,
       actorId: user.id,
       actorEmail: user.email,
       action: locked ? 'AUTH_PIN_LOCKED' : 'AUTH_PIN_FAILED',
@@ -59,14 +70,15 @@ export async function POST(request: NextRequest) {
   }
 
   const prior = await getActiveSession();
-  if (prior?.sessionId) {
+  if (prior?.sessionId && prior.sandboxId === sbx.sandboxId) {
     await prisma.session.updateMany({
-      where: { id: prior.sessionId, revokedAt: null },
+      where: { id: prior.sessionId, sandboxId: sbx.sandboxId, revokedAt: null },
       data: { revokedAt: now },
     });
   }
 
   const sessionId = await issueSessionCookie({
+    sandboxId: sbx.sandboxId,
     userId: user.id,
     email: user.email,
     role: user.role,
@@ -75,6 +87,7 @@ export async function POST(request: NextRequest) {
   });
 
   await writeAuditLog({
+    sandboxId: sbx.sandboxId,
     actorId: user.id,
     actorEmail: user.email,
     action: 'AUTH_PIN_SWITCH',
@@ -85,6 +98,7 @@ export async function POST(request: NextRequest) {
   });
 
   return NextResponse.json({
+    sandboxId: sbx.sandboxId,
     user: { id: user.id, email: user.email, name: user.name, role: user.role },
   });
 }

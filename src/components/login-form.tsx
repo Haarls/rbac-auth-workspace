@@ -2,7 +2,7 @@
 
 import { AlertCircle, ArrowRight, Eye, EyeOff, Loader2, ShieldCheck } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { DEMO_ACCOUNTS } from '../lib/demo-accounts';
 import { ROLE_DOT } from '../lib/permissions';
 import { apiJson, BTN_PRIMARY, type RequestState } from '../lib/ui';
@@ -33,6 +33,10 @@ export function LoginForm() {
 
   const matchedDemo = DEMO_ACCOUNTS.find((a) => a.email === email.trim().toLowerCase());
   const pending = req.status === 'loading';
+
+  useEffect(() => {
+    void fetch('/api/sandbox', { method: 'POST' });
+  }, []);
 
   async function submitAuth(authMode: 'PASSWORD' | 'PIN', pinOverride?: string) {
     if (pending) return;
@@ -92,7 +96,7 @@ export function LoginForm() {
             )}
           </div>
           <input
-            id="auth-email" type="email" required autoComplete="email" value={email}
+            id="auth-email" type="email" required maxLength={100} autoComplete="email" value={email}
             onChange={(e) => setEmail(e.target.value)} placeholder="operator@demo.dev" className={`mt-1.5 ${FIELD_CLS}`}
           />
         </div>
@@ -108,7 +112,7 @@ export function LoginForm() {
             </div>
             <div className="relative mt-1.5">
               <input
-                id="auth-password" type={showPass ? 'text' : 'password'} required autoComplete="current-password"
+                id="auth-password" type={showPass ? 'text' : 'password'} required maxLength={64} autoComplete="current-password"
                 value={password} onChange={(e) => setPassword(e.target.value)} className={`${FIELD_CLS} pr-9`}
               />
               <button

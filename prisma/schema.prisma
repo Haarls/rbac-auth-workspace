@@ -13,9 +13,25 @@ enum Role {
   STAFF
 }
 
+model Sandbox {
+  id        String     @id @default(cuid())
+  ipHash    String
+  createdAt DateTime   @default(now())
+  expiresAt DateTime
+  users     User[]
+  sessions  Session[]
+  shiftLogs ShiftLog[]
+  auditLogs AuditLog[]
+
+  @@index([expiresAt])
+  @@index([ipHash, createdAt])
+}
+
 model User {
   id             String     @id @default(cuid())
-  email          String     @unique
+  sandboxId      String
+  sandbox        Sandbox    @relation(fields: [sandboxId], references: [id], onDelete: Cascade)
+  email          String
   name           String
   passwordHash   String
   pinHash        String?
@@ -26,10 +42,15 @@ model User {
   sessions       Session[]
   shiftLogs      ShiftLog[]
   actorAudits    AuditLog[] @relation("AuditActor")
+
+  @@unique([sandboxId, email])
+  @@index([sandboxId])
 }
 
 model Session {
   id        String    @id @default(cuid())
+  sandboxId String
+  sandbox   Sandbox   @relation(fields: [sandboxId], references: [id], onDelete: Cascade)
   userId    String
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   method    String
@@ -38,11 +59,13 @@ model Session {
   revokedAt DateTime?
   createdAt DateTime  @default(now())
 
-  @@index([userId, revokedAt])
+  @@index([sandboxId, userId, revokedAt])
 }
 
 model ShiftLog {
   id             String   @id @default(cuid())
+  sandboxId      String
+  sandbox        Sandbox  @relation(fields: [sandboxId], references: [id], onDelete: Cascade)
   station        String
   summary        String
   cashDeltaCents Int
@@ -51,11 +74,13 @@ model ShiftLog {
   author         User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
   createdAt      DateTime @default(now())
 
-  @@index([createdAt])
+  @@index([sandboxId, createdAt])
 }
 
 model AuditLog {
   id         String   @id @default(cuid())
+  sandboxId  String
+  sandbox    Sandbox  @relation(fields: [sandboxId], references: [id], onDelete: Cascade)
   actorId    String?
   actorEmail String
   actor      User?    @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
@@ -64,5 +89,5 @@ model AuditLog {
   detail     String
   createdAt  DateTime @default(now())
 
-  @@index([action, createdAt])
+  @@index([sandboxId, action, createdAt])
 }

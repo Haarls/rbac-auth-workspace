@@ -11,23 +11,26 @@ export default async function WorkspacePage() {
   if (!ctx) redirect('/login');
 
   const now = new Date();
+  const { sandboxId } = ctx;
   const canReadTeam = hasPermission(ctx.user.role, 'team:read');
   const canRevoke = hasPermission(ctx.user.role, 'session:revoke');
   const canReadAudit = hasPermission(ctx.user.role, 'audit:read');
 
   const [pinUsers, shiftRows, teamRows, sessionRows, auditRows] = await Promise.all([
     prisma.user.findMany({
-      where: { pinHash: { not: null } },
+      where: { sandboxId, pinHash: { not: null } },
       orderBy: { name: 'asc' },
       select: { email: true, name: true, role: true },
     }),
     prisma.shiftLog.findMany({
+      where: { sandboxId },
       orderBy: { createdAt: 'desc' },
       take: 40,
       include: { author: { select: { email: true } } },
     }),
     canReadTeam
       ? prisma.user.findMany({
+          where: { sandboxId },
           orderBy: { createdAt: 'asc' },
           select: {
             id: true,
@@ -42,19 +45,24 @@ export default async function WorkspacePage() {
       : Promise.resolve([]),
     canRevoke
       ? prisma.session.findMany({
-          where: { revokedAt: null, expiresAt: { gt: now } },
+          where: { sandboxId, revokedAt: null, expiresAt: { gt: now } },
           orderBy: { createdAt: 'desc' },
           take: 30,
           include: { user: { select: { email: true, role: true } } },
         })
       : Promise.resolve([]),
     canReadAudit
-      ? prisma.auditLog.findMany({ orderBy: { createdAt: 'desc' }, take: 80 })
+      ? prisma.auditLog.findMany({
+          where: { sandboxId },
+          orderBy: { createdAt: 'desc' },
+          take: 80,
+        })
       : Promise.resolve([]),
   ]);
 
   return (
     <WorkspaceShell
+      sandboxId={sandboxId}
       currentUser={{
         id: ctx.user.id,
         name: ctx.user.name,

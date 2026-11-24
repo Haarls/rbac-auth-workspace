@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { evaluatePinAttempt, hashSecret, verifySecret } from '../src/lib/crypto';
 import { signSessionJwt, verifySessionJwt } from '../src/lib/jwt';
 import { hasPermission, requiredRoleLabel } from '../src/lib/permissions';
+import { checkWriteRateLimit, parseJsonBody, resetRateLimitsForTest } from '../src/lib/security';
 
 describe('rbac-auth-workspace security primitives', () => {
   it('enforces granular RBAC matrix across OWNER, MANAGER, and STAFF', () => {
@@ -64,9 +65,10 @@ describe('rbac-auth-workspace security primitives', () => {
     expect(afterExpiry.nextLockedUntil).toBeNull();
   });
 
-  it('signs HS256 session JWTs and rejects tampered tokens', async () => {
+  it('signs HS256 sandbox-scoped session JWTs and rejects tampered tokens', async () => {
     const token = await signSessionJwt({
       sid: 'sess_12345',
+      sbx: 'sbx_abc',
       sub: 'usr_99',
       email: 'owner@demo.dev',
       role: 'OWNER',
@@ -75,6 +77,7 @@ describe('rbac-auth-workspace security primitives', () => {
     const verified = await verifySessionJwt(token);
     expect(verified).toEqual({
       sid: 'sess_12345',
+      sbx: 'sbx_abc',
       sub: 'usr_99',
       email: 'owner@demo.dev',
       role: 'OWNER',
@@ -82,5 +85,24 @@ describe('rbac-auth-workspace security primitives', () => {
 
     const tampered = `${token.slice(0, -4)}xxxx`;
     expect(await verifySessionJwt(tampered)).toBeNull();
+  });
+
+  it('enforces 25/min IP write rate limit and rejects >32KB JSON payloads', async () => {
+    resetRateLimitsForTest();
+    const t0 = 1_700_000_000_000;
+    for (let i = 0; i < 25; i++) {
+      expect(checkWriteRateLimit('203.0.113.10', t0 + i * 10)).toBeNull();
+    }
+    const blocked = checkWriteRateLimit('203.0.113.10', t0 + 1_000);
+    expect(blocked?.status).toBe(429);
+    expect(checkWriteRateLimit('203.0.113.10', t0 + 61_000)).toBeNull();
+
+    const hugeReq = new Request('http://localhost/api/shifts', {
+      method: 'POST',
+      body: JSON.stringify({ pad: 'a'.repeat(35_000) }),
+    });
+    const parsed = await parseJsonBody(hugeReq);
+    expect(parsed.ok).toBe(false);
+    if (!parsed.ok) expect(parsed.response.status).toBe(413);
   });
 });

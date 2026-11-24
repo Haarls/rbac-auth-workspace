@@ -88,6 +88,7 @@ export function AuditPanel({ audits }: { audits: AuditEntryRow[] }) {
             <input
               id="audit-search"
               type="search"
+              maxLength={200}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Filter actor, target, detail..."
